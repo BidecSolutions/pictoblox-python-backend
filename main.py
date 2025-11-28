@@ -22,7 +22,61 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Blockly Platform API",
     description="Backend API for Visual Programming Platform like PictoBlox",
-    version="1.0.0"
+    version="1.0.0",
+    tags_metadata=[
+        {
+            "name": "Authentication",
+            "description": "User registration, login, and profile management endpoints."
+        },
+        {
+            "name": "Projects",
+            "description": "Project management operations - create, read, update, delete, and duplicate projects."
+        },
+        {
+            "name": "Sprites",
+            "description": "Sprite management - create, update, delete sprites, manage positions, rotation, size, visibility, and layer ordering."
+        },
+        {
+            "name": "Costumes",
+            "description": "Costume management for sprites - create, upload, update, delete costumes and set active costume."
+        },
+        {
+            "name": "Backdrops",
+            "description": "Backdrop management for stage backgrounds - create, upload, update, and delete backdrops."
+        },
+        {
+            "name": "Stage",
+            "description": "Stage settings and configuration - dimensions, backdrop, audio, video, and performance settings."
+        },
+        {
+            "name": "Variables",
+            "description": "Variable management - create, read, update, delete global and sprite-specific variables."
+        },
+        {
+            "name": "Lists",
+            "description": "List management - create, read, update, delete global and sprite-specific lists."
+        },
+        {
+            "name": "Code Execution",
+            "description": "Execute Python or JavaScript code in a sandboxed environment with timeout and resource limits."
+        },
+        {
+            "name": "Assets",
+            "description": "General asset management - upload, list, and delete project assets (sprites, sounds, images, videos)."
+        },
+        {
+            "name": "Library",
+            "description": "Access pre-made sprites and backdrops from the library and add them to projects."
+        },
+        {
+            "name": "Sharing",
+            "description": "Project sharing and collaboration features - share projects with other users with permissions."
+        },
+        {
+            "name": "Health",
+            "description": "Health check and service status endpoints."
+        },
+    ]
 )
 
 # CORS Configuration
@@ -40,7 +94,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED, tags=["Authentication"])
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     """Register a new user"""
     db_user = crud.get_user_by_email(db, email=user.email)
@@ -54,7 +108,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
 
 
-@app.post("/api/v1/token", response_model=schemas.Token)
+@app.post("/api/v1/token", response_model=schemas.Token, tags=["Authentication"])
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Login and get access token"""
     user = auth.authenticate_user(db, form_data.username, form_data.password)
@@ -73,13 +127,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/api/v1/users/me", response_model=schemas.User)
+@app.get("/api/v1/users/me", response_model=schemas.User, tags=["Authentication"])
 def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     """Get current user information"""
     return current_user
 
 
-@app.put("/api/v1/users/me", response_model=schemas.User)
+@app.put("/api/v1/users/me", response_model=schemas.User, tags=["Authentication"])
 def update_user_profile(
     user_update: schemas.UserUpdate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -93,7 +147,7 @@ def update_user_profile(
 # PROJECT MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/projects", response_model=schemas.Project, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/projects", response_model=schemas.Project, status_code=status.HTTP_201_CREATED, tags=["Projects"])
 def create_project(
     project: schemas.ProjectCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -103,7 +157,7 @@ def create_project(
     return crud.create_project(db=db, project=project, user_id=current_user.id)
 
 
-@app.get("/api/v1/projects", response_model=List[schemas.Project])
+@app.get("/api/v1/projects", response_model=List[schemas.Project], tags=["Projects"])
 def list_projects(
     skip: int = 0,
     limit: int = 100,
@@ -114,7 +168,7 @@ def list_projects(
     return crud.get_user_projects(db, user_id=current_user.id, skip=skip, limit=limit)
 
 
-@app.get("/api/v1/projects/{project_id}", response_model=schemas.Project)
+@app.get("/api/v1/projects/{project_id}", response_model=schemas.Project, tags=["Projects"])
 def get_project(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -131,7 +185,7 @@ def get_project(
     return project
 
 
-@app.put("/api/v1/projects/{project_id}", response_model=schemas.Project)
+@app.put("/api/v1/projects/{project_id}", response_model=schemas.Project, tags=["Projects"])
 def update_project(
     project_id: int,
     project_update: schemas.ProjectUpdate,
@@ -149,7 +203,7 @@ def update_project(
     return crud.update_project(db, project_id=project_id, project_update=project_update)
 
 
-@app.delete("/api/v1/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Projects"])
 def delete_project(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -167,7 +221,7 @@ def delete_project(
     return None
 
 
-@app.post("/api/v1/projects/{project_id}/duplicate", response_model=schemas.Project)
+@app.post("/api/v1/projects/{project_id}/duplicate", response_model=schemas.Project, tags=["Projects"])
 def duplicate_project(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -188,7 +242,7 @@ def duplicate_project(
 # CODE EXECUTION ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/execute", response_model=schemas.ExecutionResult)
+@app.post("/api/v1/execute", response_model=schemas.ExecutionResult, tags=["Code Execution"])
 def execute_code(
     execution: schemas.CodeExecution,
     current_user: models.User = Depends(auth.get_current_user),
@@ -222,7 +276,7 @@ def execute_code(
 # ASSET MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/projects/{project_id}/assets", response_model=schemas.Asset)
+@app.post("/api/v1/projects/{project_id}/assets", response_model=schemas.Asset, tags=["Assets"])
 def upload_asset(
     project_id: int,
     asset: schemas.AssetCreate,
@@ -237,7 +291,7 @@ def upload_asset(
     return crud.create_asset(db=db, asset=asset, project_id=project_id)
 
 
-@app.get("/api/v1/projects/{project_id}/assets", response_model=List[schemas.Asset])
+@app.get("/api/v1/projects/{project_id}/assets", response_model=List[schemas.Asset], tags=["Assets"])
 def list_assets(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -254,7 +308,7 @@ def list_assets(
     return crud.get_project_assets(db, project_id=project_id)
 
 
-@app.delete("/api/v1/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Assets"])
 def delete_asset(
     asset_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -277,7 +331,7 @@ def delete_asset(
 # SHARING & COLLABORATION
 # ============================================================================
 
-@app.get("/api/v1/projects/list/public", response_model=List[schemas.Project])
+@app.get("/api/v1/projects/list/public", response_model=List[schemas.Project], tags=["Projects"])
 def list_public_projects(
     skip: int = 0,
     limit: int = 50,
@@ -287,7 +341,7 @@ def list_public_projects(
     return crud.get_public_projects(db, skip=skip, limit=limit)
 
 
-@app.post("/api/v1/projects/{project_id}/share")
+@app.post("/api/v1/projects/{project_id}/share", tags=["Sharing"])
 def share_project(
     project_id: int,
     share_data: schemas.ProjectShare,
@@ -324,7 +378,7 @@ from PIL import Image
 # SPRITE MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/sprites", response_model=schemas.Sprite, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/sprites", response_model=schemas.Sprite, status_code=status.HTTP_201_CREATED, tags=["Sprites"])
 def create_sprite(
     sprite: schemas.SpriteCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -347,7 +401,7 @@ def create_sprite(
     return crud.create_sprite(db=db, sprite=sprite)
 
 
-@app.get("/api/v1/projects/{project_id}/sprites", response_model=List[schemas.SpriteWithCostumes])
+@app.get("/api/v1/projects/{project_id}/sprites", response_model=List[schemas.SpriteWithCostumes], tags=["Sprites"])
 def list_project_sprites(
     project_id: int,
     include_costumes: bool = Query(True),
@@ -366,7 +420,7 @@ def list_project_sprites(
     return crud.get_project_sprites(db, project_id=project_id, include_costumes=include_costumes)
 
 
-@app.get("/api/v1/sprites/{sprite_id}", response_model=schemas.SpriteComplete)
+@app.get("/api/v1/sprites/{sprite_id}", response_model=schemas.SpriteComplete, tags=["Sprites"])
 def get_sprite(
     sprite_id: int,
     include_costumes: bool = Query(True),
@@ -388,7 +442,7 @@ def get_sprite(
     return sprite
 
 
-@app.put("/api/v1/sprites/{sprite_id}", response_model=schemas.Sprite)
+@app.put("/api/v1/sprites/{sprite_id}", response_model=schemas.Sprite, tags=["Sprites"])
 def update_sprite(
     sprite_id: int,
     sprite_update: schemas.SpriteUpdate,
@@ -408,7 +462,7 @@ def update_sprite(
     return crud.update_sprite(db, sprite_id=sprite_id, sprite_update=sprite_update)
 
 
-@app.delete("/api/v1/sprites/{sprite_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/sprites/{sprite_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Sprites"])
 def delete_sprite(
     sprite_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -427,7 +481,7 @@ def delete_sprite(
     return None
 
 
-@app.post("/api/v1/sprites/{sprite_id}/duplicate", response_model=schemas.Sprite)
+@app.post("/api/v1/sprites/{sprite_id}/duplicate", response_model=schemas.Sprite, tags=["Sprites"])
 def duplicate_sprite(
     sprite_id: int,
     new_name: Optional[str] = None,
@@ -450,7 +504,7 @@ def duplicate_sprite(
     return duplicated
 
 
-@app.put("/api/v1/projects/{project_id}/sprites/reorder")
+@app.put("/api/v1/projects/{project_id}/sprites/reorder", tags=["Sprites"])
 def reorder_sprites(
     project_id: int,
     reorder_data: schemas.LayerReorderRequest,
@@ -472,7 +526,7 @@ def reorder_sprites(
     return {"message": "Sprites reordered successfully"}
 
 
-@app.put("/api/v1/sprites/{sprite_id}/front", response_model=schemas.Sprite)
+@app.put("/api/v1/sprites/{sprite_id}/front", response_model=schemas.Sprite, tags=["Sprites"])
 def bring_to_front(
     sprite_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -490,7 +544,7 @@ def bring_to_front(
     return crud.bring_sprite_to_front(db, sprite_id)
 
 
-@app.put("/api/v1/sprites/{sprite_id}/back", response_model=schemas.Sprite)
+@app.put("/api/v1/sprites/{sprite_id}/back", response_model=schemas.Sprite, tags=["Sprites"])
 def send_to_back(
     sprite_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -512,7 +566,7 @@ def send_to_back(
 # SPRITE ACTION ENDPOINTS (Runtime operations)
 # ============================================================================
 
-@app.put("/api/v1/sprites/{sprite_id}/move")
+@app.put("/api/v1/sprites/{sprite_id}/move", tags=["Sprites"])
 def move_sprite(
     sprite_id: int,
     move_data: schemas.MoveSpriteRequest,
@@ -530,7 +584,7 @@ def move_sprite(
     return updated
 
 
-@app.put("/api/v1/sprites/{sprite_id}/rotate")
+@app.put("/api/v1/sprites/{sprite_id}/rotate", tags=["Sprites"])
 def rotate_sprite(
     sprite_id: int,
     rotate_data: schemas.RotateSpriteRequest,
@@ -545,7 +599,7 @@ def rotate_sprite(
     return updated
 
 
-@app.put("/api/v1/sprites/{sprite_id}/size")
+@app.put("/api/v1/sprites/{sprite_id}/size", tags=["Sprites"])
 def change_sprite_size(
     sprite_id: int,
     size_data: schemas.SizeSpriteRequest,
@@ -560,7 +614,7 @@ def change_sprite_size(
     return updated
 
 
-@app.put("/api/v1/sprites/{sprite_id}/visibility")
+@app.put("/api/v1/sprites/{sprite_id}/visibility", tags=["Sprites"])
 def set_sprite_visibility(
     sprite_id: int,
     visibility_data: schemas.VisibilityRequest,
@@ -579,7 +633,7 @@ def set_sprite_visibility(
 # COSTUME MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/costumes", response_model=schemas.Costume, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/costumes", response_model=schemas.Costume, status_code=status.HTTP_201_CREATED, tags=["Costumes"])
 def create_costume(
     costume: schemas.CostumeCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -597,7 +651,7 @@ def create_costume(
     return crud.create_costume(db=db, costume=costume)
 
 
-@app.post("/api/v1/costumes/upload", response_model=schemas.Costume)
+@app.post("/api/v1/costumes/upload", response_model=schemas.Costume, tags=["Costumes"])
 async def upload_costume_image(
     sprite_id: int,
     name: str,
@@ -651,7 +705,7 @@ async def upload_costume_image(
     return crud.create_costume(db, costume_data)
 
 
-@app.get("/api/v1/sprites/{sprite_id}/costumes", response_model=List[schemas.Costume])
+@app.get("/api/v1/sprites/{sprite_id}/costumes", response_model=List[schemas.Costume], tags=["Costumes"])
 def list_sprite_costumes(
     sprite_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -665,7 +719,7 @@ def list_sprite_costumes(
     return crud.get_sprite_costumes(db, sprite_id=sprite_id)
 
 
-@app.put("/api/v1/costumes/{costume_id}", response_model=schemas.Costume)
+@app.put("/api/v1/costumes/{costume_id}", response_model=schemas.Costume, tags=["Costumes"])
 def update_costume(
     costume_id: int,
     costume_update: schemas.CostumeUpdate,
@@ -685,7 +739,7 @@ def update_costume(
     return crud.update_costume(db, costume_id=costume_id, costume_update=costume_update)
 
 
-@app.delete("/api/v1/costumes/{costume_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/costumes/{costume_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Costumes"])
 def delete_costume(
     costume_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -705,7 +759,7 @@ def delete_costume(
     return None
 
 
-@app.put("/api/v1/sprites/{sprite_id}/costume", response_model=schemas.Sprite)
+@app.put("/api/v1/sprites/{sprite_id}/costume", response_model=schemas.Sprite, tags=["Costumes"])
 def set_active_costume(
     sprite_id: int,
     costume_request: schemas.SetCostumeRequest,
@@ -728,7 +782,7 @@ def set_active_costume(
     return updated
 
 
-@app.post("/api/v1/costumes/{costume_id}/duplicate", response_model=schemas.Costume)
+@app.post("/api/v1/costumes/{costume_id}/duplicate", response_model=schemas.Costume, tags=["Costumes"])
 def duplicate_costume(
     costume_id: int,
     new_name: Optional[str] = None,
@@ -759,7 +813,7 @@ CONTINUATION - Add these endpoints after the costume endpoints in main.py
 # BACKDROP MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/backdrops", response_model=schemas.Backdrop, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/backdrops", response_model=schemas.Backdrop, status_code=status.HTTP_201_CREATED, tags=["Backdrops"])
 def create_backdrop(
     backdrop: schemas.BackdropCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -776,7 +830,7 @@ def create_backdrop(
     return crud.create_backdrop(db=db, backdrop=backdrop)
 
 
-@app.post("/api/v1/backdrops/upload", response_model=schemas.Backdrop)
+@app.post("/api/v1/backdrops/upload", response_model=schemas.Backdrop, tags=["Backdrops"])
 async def upload_backdrop_image(
     project_id: int,
     name: str,
@@ -825,7 +879,7 @@ async def upload_backdrop_image(
     return crud.create_backdrop(db, backdrop_data)
 
 
-@app.get("/api/v1/projects/{project_id}/backdrops", response_model=List[schemas.Backdrop])
+@app.get("/api/v1/projects/{project_id}/backdrops", response_model=List[schemas.Backdrop], tags=["Backdrops"])
 def list_project_backdrops(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -842,7 +896,7 @@ def list_project_backdrops(
     return crud.get_project_backdrops(db, project_id=project_id)
 
 
-@app.put("/api/v1/backdrops/{backdrop_id}", response_model=schemas.Backdrop)
+@app.put("/api/v1/backdrops/{backdrop_id}", response_model=schemas.Backdrop, tags=["Backdrops"])
 def update_backdrop(
     backdrop_id: int,
     backdrop_update: schemas.BackdropUpdate,
@@ -861,7 +915,7 @@ def update_backdrop(
     return crud.update_backdrop(db, backdrop_id=backdrop_id, backdrop_update=backdrop_update)
 
 
-@app.delete("/api/v1/backdrops/{backdrop_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/backdrops/{backdrop_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Backdrops"])
 def delete_backdrop(
     backdrop_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -884,7 +938,7 @@ def delete_backdrop(
 # STAGE MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@app.get("/api/v1/projects/{project_id}/stage", response_model=schemas.StageSetting)
+@app.get("/api/v1/projects/{project_id}/stage", response_model=schemas.StageSetting, tags=["Stage"])
 def get_stage_settings(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -907,7 +961,7 @@ def get_stage_settings(
     return settings
 
 
-@app.put("/api/v1/projects/{project_id}/stage", response_model=schemas.StageSetting)
+@app.put("/api/v1/projects/{project_id}/stage", response_model=schemas.StageSetting, tags=["Stage"])
 def update_stage_settings(
     project_id: int,
     settings_update: schemas.StageSettingUpdate,
@@ -925,7 +979,7 @@ def update_stage_settings(
     return crud.update_stage_setting(db, project_id, settings_update)
 
 
-@app.put("/api/v1/projects/{project_id}/stage/backdrop", response_model=schemas.StageSetting)
+@app.put("/api/v1/projects/{project_id}/stage/backdrop", response_model=schemas.StageSetting, tags=["Stage"])
 def set_stage_backdrop(
     project_id: int,
     backdrop_request: schemas.SetBackdropRequest,
@@ -948,7 +1002,7 @@ def set_stage_backdrop(
     return crud.set_stage_backdrop(db, project_id, backdrop_request.backdrop_id)
 
 
-@app.get("/api/v1/projects/{project_id}/stage/complete", response_model=schemas.StageComplete)
+@app.get("/api/v1/projects/{project_id}/stage/complete", response_model=schemas.StageComplete, tags=["Stage"])
 def get_complete_stage_data(
     project_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -969,7 +1023,7 @@ def get_complete_stage_data(
 # SPRITE VARIABLE ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/variables", response_model=schemas.SpriteVariable, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/variables", response_model=schemas.SpriteVariable, status_code=status.HTTP_201_CREATED, tags=["Variables"])
 def create_variable(
     variable: schemas.SpriteVariableCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -992,7 +1046,7 @@ def create_variable(
     return crud.create_variable(db=db, variable=variable)
 
 
-@app.get("/api/v1/projects/{project_id}/variables", response_model=List[schemas.SpriteVariable])
+@app.get("/api/v1/projects/{project_id}/variables", response_model=List[schemas.SpriteVariable], tags=["Variables"])
 def list_project_variables(
     project_id: int,
     sprite_id: Optional[int] = Query(None),
@@ -1011,7 +1065,7 @@ def list_project_variables(
     return crud.get_project_variables(db, project_id, sprite_id, global_only)
 
 
-@app.get("/api/v1/variables/{variable_id}", response_model=schemas.SpriteVariable)
+@app.get("/api/v1/variables/{variable_id}", response_model=schemas.SpriteVariable, tags=["Variables"])
 def get_variable(
     variable_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -1029,7 +1083,7 @@ def get_variable(
     return variable
 
 
-@app.put("/api/v1/variables/{variable_id}", response_model=schemas.SpriteVariable)
+@app.put("/api/v1/variables/{variable_id}", response_model=schemas.SpriteVariable, tags=["Variables"])
 def update_variable(
     variable_id: int,
     variable_update: schemas.SpriteVariableUpdate,
@@ -1048,7 +1102,7 @@ def update_variable(
     return crud.update_variable(db, variable_id, variable_update)
 
 
-@app.delete("/api/v1/variables/{variable_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/variables/{variable_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Variables"])
 def delete_variable(
     variable_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -1071,7 +1125,7 @@ def delete_variable(
 # SPRITE LIST ENDPOINTS
 # ============================================================================
 
-@app.post("/api/v1/lists", response_model=schemas.SpriteList, status_code=status.HTTP_201_CREATED)
+@app.post("/api/v1/lists", response_model=schemas.SpriteList, status_code=status.HTTP_201_CREATED, tags=["Lists"])
 def create_list(
     list_data: schemas.SpriteListCreate,
     current_user: models.User = Depends(auth.get_current_user),
@@ -1094,7 +1148,7 @@ def create_list(
     return crud.create_list(db=db, list_data=list_data)
 
 
-@app.get("/api/v1/projects/{project_id}/lists", response_model=List[schemas.SpriteList])
+@app.get("/api/v1/projects/{project_id}/lists", response_model=List[schemas.SpriteList], tags=["Lists"])
 def list_project_lists(
     project_id: int,
     sprite_id: Optional[int] = Query(None),
@@ -1113,7 +1167,7 @@ def list_project_lists(
     return crud.get_project_lists(db, project_id, sprite_id, global_only)
 
 
-@app.put("/api/v1/lists/{list_id}", response_model=schemas.SpriteList)
+@app.put("/api/v1/lists/{list_id}", response_model=schemas.SpriteList, tags=["Lists"])
 def update_list(
     list_id: int,
     list_update: schemas.SpriteListUpdate,
@@ -1132,7 +1186,7 @@ def update_list(
     return crud.update_list(db, list_id, list_update)
 
 
-@app.delete("/api/v1/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Lists"])
 def delete_list(
     list_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -1155,7 +1209,7 @@ def delete_list(
 # LIBRARY ENDPOINTS
 # ============================================================================
 
-@app.get("/api/v1/library/sprites", response_model=List[schemas.LibrarySprite])
+@app.get("/api/v1/library/sprites", response_model=List[schemas.LibrarySprite], tags=["Library"])
 def list_library_sprites(
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -1167,7 +1221,7 @@ def list_library_sprites(
     return crud.get_library_sprites(db, category, search, skip, limit)
 
 
-@app.get("/api/v1/library/backdrops", response_model=List[schemas.LibraryBackdrop])
+@app.get("/api/v1/library/backdrops", response_model=List[schemas.LibraryBackdrop], tags=["Library"])
 def list_library_backdrops(
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -1179,7 +1233,7 @@ def list_library_backdrops(
     return crud.get_library_backdrops(db, category, search, skip, limit)
 
 
-@app.post("/api/v1/projects/{project_id}/library/sprite", response_model=schemas.Sprite)
+@app.post("/api/v1/projects/{project_id}/library/sprite", response_model=schemas.Sprite, tags=["Library"])
 def add_library_sprite_to_project(
     project_id: int,
     library_sprite_id: int,
@@ -1216,7 +1270,7 @@ def add_library_sprite_to_project(
     return crud.create_sprite(db, sprite_create)
 
 
-@app.post("/api/v1/projects/{project_id}/library/backdrop", response_model=schemas.Backdrop)
+@app.post("/api/v1/projects/{project_id}/library/backdrop", response_model=schemas.Backdrop, tags=["Library"])
 def add_library_backdrop_to_project(
     project_id: int,    
     library_backdrop_id: int,
@@ -1257,7 +1311,7 @@ def add_library_backdrop_to_project(
 # HEALTH CHECK
 # ============================================================================
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "blockly-backend"}
@@ -1265,4 +1319,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8002)
