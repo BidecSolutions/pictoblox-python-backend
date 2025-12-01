@@ -4,9 +4,10 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Database
-sqlalchemy==2.0.23
+# sqlalchemy==2.0.23
+SQLAlchemy==2.0.36
 alembic==1.12.1
-
+psycopg2-binary==2.9.9
 # PostgreSQL driver (uncomment if using PostgreSQL)
 # psycopg2-binary==2.9.9
 
@@ -45,3 +46,4 @@ mypy==1.7.1
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
+Pillow==10.4.0

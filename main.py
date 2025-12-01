@@ -1317,6 +1317,328 @@ def health_check():
     return {"status": "healthy", "service": "blockly-backend"}
 
 
+# ============================================================================
+# SPRITE MOTION ENDPOINTS (Motion Blocks)
+# ============================================================================
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/move", response_model=schemas.Sprite, tags=["Sprites"])
+def move_sprite(
+    sprite_id: int,
+    steps: schemas.MotionMove,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Move the sprite 'steps' steps in its current direction."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # The actual calculation for new x, y will be in crud.move_sprite
+    return crud.move_sprite(db, sprite_id=sprite_id, steps=steps.steps)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/turn_right", response_model=schemas.Sprite, tags=["Sprites"])
+def turn_right_sprite(
+    sprite_id: int,
+    degrees: schemas.MotionTurn,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Turn the sprite right (clockwise) by 'degrees'."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return crud.turn_sprite(db, sprite_id=sprite_id, degrees=degrees.degrees, clockwise=True)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/turn_left", response_model=schemas.Sprite, tags=["Sprites"])
+def turn_left_sprite(
+    sprite_id: int,
+    degrees: schemas.MotionTurn,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Turn the sprite left (counter-clockwise) by 'degrees'."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return crud.turn_sprite(db, sprite_id=sprite_id, degrees=degrees.degrees, clockwise=False)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/go_to", response_model=schemas.Sprite, tags=["Sprites"])
+def go_to_position(
+    sprite_id: int,
+    # CHANGE: Use a single payload model
+    goto_data: schemas.MotionGoToPayload, 
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Go to a specific x/y, random position, or target object (e.g., mouse-pointer)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.go_to_position(db, sprite_id=sprite_id, target=goto_data.target, x=goto_data.x, y=goto_data.y)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/glide", response_model=schemas.Sprite, tags=["Sprites"])
+def glide_to_position(
+    sprite_id: int,
+    glide_data: schemas.MotionGlide,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Glide to a specific position over a given duration. (The actual glide animation is client-side)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # For a real-time system, this would trigger an event/animation. 
+    # Here, it just updates the position instantly after the 'glide' duration.
+    return crud.glide_to_position(db, sprite_id=sprite_id, secs=glide_data.secs, target=glide_data.target, x=glide_data.x, y=glide_data.y)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/set_direction", response_model=schemas.Sprite, tags=["Sprites"])
+def point_in_direction(
+    sprite_id: int,
+    direction_data: schemas.MotionPointDirection,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set the sprite's direction (0-360 degrees)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_direction(db, sprite_id=sprite_id, direction=direction_data.direction)
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/point_towards", response_model=schemas.Sprite, tags=["Sprites"])
+def point_towards_target(
+    sprite_id: int,
+    # CHANGE THIS LINE: Use the comprehensive payload model
+    point_data: schemas.MotionPointTowardsPayload, 
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Point the sprite towards a target (e.g., mouse-pointer or another sprite ID)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Pass the fields from the payload object to the CRUD function
+    return crud.point_sprite_towards(
+        db, 
+        sprite_id=sprite_id, 
+        target=point_data.target, # target field from the payload
+        x=point_data.x, 
+        y=point_data.y
+    )
+
+# @app.put("/api/v1/sprites/{sprite_id}/motion/point_towards", response_model=schemas.Sprite, tags=["Sprites"])
+# def point_towards_target(
+#     sprite_id: int,
+#     point_data: schemas.MotionPointTowardsPayload,
+#     target: schemas.MotionPointTowardsTarget,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Point the sprite towards a target (e.g., mouse-pointer or another sprite ID)."""
+#     sprite = crud.get_sprite(db, sprite_id)
+#     if not sprite:
+#         raise HTTPException(status_code=404, detail="Sprite not found")
+#     project = crud.get_project(db, sprite.project_id)
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+
+#     # The actual calculation (atan2) for the new direction will be in crud.point_towards
+#     return crud.point_sprite_towards(db, sprite_id=sprite_id, target=point_data.target, x=point_data.x, y=point_data.y)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/change_x", response_model=schemas.Sprite, tags=["Sprites"])
+def change_x_by(
+    sprite_id: int,
+    change_x: schemas.MotionChangePosition,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change the sprite's x position by an amount."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.change_sprite_x(db, sprite_id=sprite_id, change=change_x.change)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/set_x", response_model=schemas.Sprite, tags=["Sprites"])
+def set_x_to(
+    sprite_id: int,
+    set_x: schemas.MotionSetPosition,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set the sprite's x position to a specific value."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_x(db, sprite_id=sprite_id, value=set_x.value)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/change_y", response_model=schemas.Sprite, tags=["Sprites"])
+def change_y_by(
+    sprite_id: int,
+    change_y: schemas.MotionChangePosition,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change the sprite's y position by an amount."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.change_sprite_y(db, sprite_id=sprite_id, change=change_y.change)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/set_y", response_model=schemas.Sprite, tags=["Sprites"])
+def set_y_to(
+    sprite_id: int,
+    set_y: schemas.MotionSetPosition,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set the sprite's y position to a specific value."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_y(db, sprite_id=sprite_id, value=set_y.value)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/if_on_edge_bounce", response_model=schemas.Sprite, tags=["Sprites"])
+def if_on_edge_bounce(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """If the sprite is touching the edge of the stage, reverse its direction."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # The actual check and direction update is in crud.if_on_edge_bounce
+    return crud.if_on_edge_bounce(db, sprite_id=sprite_id)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/motion/set_rotation_style", response_model=schemas.Sprite, tags=["Sprites"])
+def set_rotation_style(
+    sprite_id: int,
+    style: schemas.MotionSetRotationStyle,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set the sprite's rotation style (all around, left-right, or don't rotate)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_rotation_style(db, sprite_id=sprite_id, rotation_style=style.rotation_style)
+
+
+@app.get("/api/v1/sprites/{sprite_id}/motion/get_x", response_model=schemas.MotionPositionValue, tags=["Sprites"])
+def get_x_position(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reporter block: Get the sprite's current X position."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    # Allow read access if project is public
+    if project.user_id != current_user.id and not project.is_public:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return {"value": sprite.x_position}
+
+@app.get("/api/v1/sprites/{sprite_id}/motion/get_y", response_model=schemas.MotionPositionValue, tags=["Sprites"])
+def get_y_position(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reporter block: Get the sprite's current Y position."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id and not project.is_public:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return {"value": sprite.y_position}
+
+@app.get("/api/v1/sprites/{sprite_id}/motion/get_direction", response_model=schemas.MotionPositionValue, tags=["Sprites"])
+def get_direction(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reporter block: Get the sprite's current direction."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id and not project.is_public:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return {"value": sprite.direction}
+
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)
+
+
+

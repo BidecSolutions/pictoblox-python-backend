@@ -26,8 +26,7 @@ import os
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres.autrofcnscovpjtkyibr:wb002119232n@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
-  
+    "postgresql://postgres.autrofcnscovpjtkyibr:wb002119232n@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"  
 )
 
 # DATABASE_URL="postgresql://pictoblox:wb002119232n@aws-1-ap-southeast-2.supabase.com:6543/postgres"

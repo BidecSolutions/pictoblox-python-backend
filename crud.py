@@ -639,6 +639,268 @@ def send_sprite_to_back(db: Session, sprite_id: int) -> Optional[models.Sprite]:
     return sprite
 
 
+# crud.py
+
+from sqlalchemy.orm import Session
+import models
+import schemas
+import math
+from typing import Optional
+
+# --- Configuration Constants (Define these at the top of crud.py) ---
+# Assuming a standard Scratch/PictoBlox stage size
+STAGE_WIDTH = 480 
+STAGE_HEIGHT = 360 
+X_MIN = -STAGE_WIDTH / 2 # -240
+X_MAX = STAGE_WIDTH / 2  # 240
+Y_MIN = -STAGE_HEIGHT / 2 # -180
+Y_MAX = STAGE_HEIGHT / 2 # 180
+
+
+# --- Helper Function for Getting Sprite ---
+
+# def get_sprite(db: Session, sprite_id: int):
+#     """Retrieve a sprite by ID."""
+#     return db.query(models.Sprite).filter(models.Sprite.id == sprite_id).first()
+
+
+# --- Motion Block Implementation ---
+
+def move_sprite(db: Session, sprite_id: int, steps: float) -> Optional[models.Sprite]:
+    """Move the sprite 'steps' steps in its current direction."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    # Scratch directions: 90 is right, 0 is up, -90/270 is left, 180 is down.
+    # Convert direction to standard radians (0=right, 90=up)
+    direction_rad = math.radians(90 - sprite.direction) 
+    
+    delta_x = steps * math.cos(direction_rad)
+    delta_y = steps * math.sin(direction_rad)
+    
+    sprite.x_position += delta_x
+    sprite.y_position += delta_y
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def turn_sprite(db: Session, sprite_id: int, degrees: float, clockwise: bool) -> Optional[models.Sprite]:
+    """Turn the sprite by 'degrees' (clockwise or counter-clockwise)."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    if clockwise:
+        sprite.direction = (sprite.direction + degrees) % 360
+    else:
+        sprite.direction = (sprite.direction - degrees) % 360
+        
+    # Normalize direction to be between -180 and 180 if preferred, though 0-360 is fine.
+    if sprite.direction > 180:
+        sprite.direction -= 360
+    elif sprite.direction <= -180:
+        sprite.direction += 360
+
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def go_to_position(db: Session, sprite_id: int, target: schemas.MotionTarget, x: Optional[float], y: Optional[float]) -> Optional[models.Sprite]:
+    """Go to a specific x/y, random position, or target object."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    if target == schemas.MotionTarget.RANDOM_POSITION:
+        import random
+        # Moves to a random position within stage boundaries
+        sprite.x_position = random.uniform(X_MIN, X_MAX)
+        sprite.y_position = random.uniform(Y_MIN, Y_MAX)
+    
+    elif target == schemas.MotionTarget.MOUSE_POINTER:
+        # NOTE: For a REST API, the client must provide the mouse coordinates as x and y.
+        if x is not None and y is not None:
+            sprite.x_position = x
+            sprite.y_position = y
+        else:
+            # Cannot move to mouse-pointer without client data
+            raise ValueError("Mouse coordinates not provided for target.")
+            
+    else: # Go to x: y: block
+        if x is not None: 
+            sprite.x_position = x
+        if y is not None: 
+            sprite.y_position = y
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def glide_to_position(db: Session, sprite_id: int, secs: float, target: Optional[schemas.MotionTarget], x: Optional[float], y: Optional[float]) -> Optional[models.Sprite]:
+    """
+    Update sprite position to the target. 
+    In a REST API, this action is instantaneous server-side. The client handles the animation over 'secs'.
+    """
+    # This function uses the same logic as go_to_position to determine the final coordinate.
+    # The 'secs' parameter is informational for the client but does not affect the DB update time.
+    return go_to_position(db, sprite_id, target=target, x=x, y=y)
+
+
+def set_sprite_direction(db: Session, sprite_id: int, direction: float) -> Optional[models.Sprite]:
+    """Set the sprite's direction."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.direction = direction % 360
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def point_sprite_towards(db: Session, sprite_id: int, target: schemas.MotionPointTowardsTarget, x: Optional[float], y: Optional[float]) -> Optional[models.Sprite]:
+    """Point the sprite towards a target (mouse-pointer or another sprite)."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    target_x = 0.0
+    target_y = 0.0
+    
+    if target == schemas.MotionTarget.MOUSE_POINTER:
+        # Requires client to send mouse coordinates
+        if x is not None and y is not None:
+            target_x = x
+            target_y = y
+        else:
+            raise ValueError("Mouse coordinates not provided for target.")
+    # Add logic here for pointing towards another sprite ID if you implement that target type.
+    
+    # Calculate direction using atan2: angle = atan2(y2-y1, x2-x1)
+    # Note: Scratch direction is 90 degrees offset (90 is up, 0 is right in standard math)
+    angle_rad = math.atan2(target_y - sprite.y_position, target_x - sprite.x_position)
+    
+    # Convert from standard math radians to Scratch degrees
+    angle_deg = math.degrees(angle_rad)
+    scratch_direction = 90 - angle_deg 
+    
+    sprite.direction = scratch_direction % 360
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def change_sprite_x(db: Session, sprite_id: int, change: float) -> Optional[models.Sprite]:
+    """Change the sprite's x position by an amount."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.x_position += change
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def set_sprite_x(db: Session, sprite_id: int, value: float) -> Optional[models.Sprite]:
+    """Set the sprite's x position to a specific value."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.x_position = value
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def change_sprite_y(db: Session, sprite_id: int, change: float) -> Optional[models.Sprite]:
+    """Change the sprite's y position by an amount."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.y_position += change
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def set_sprite_y(db: Session, sprite_id: int, value: float) -> Optional[models.Sprite]:
+    """Set the sprite's y position to a specific value."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.y_position = value
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def if_on_edge_bounce(db: Session, sprite_id: int) -> Optional[models.Sprite]:
+    """If the sprite is touching the edge of the stage, reverse its direction."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+
+    x = sprite.x_position
+    y = sprite.y_position
+    direction = sprite.direction
+    
+    # Simple check if sprite center is beyond boundary
+    if x > X_MAX or x < X_MIN:
+        # Bounce on X axis (reflect direction across Y-axis, i.e., 180 - direction)
+        direction = 180 - direction
+        
+        # Move back inside boundary slightly to prevent immediate re-bounce
+        if x > X_MAX:
+            sprite.x_position = X_MAX - 1.0 
+        else:
+            sprite.x_position = X_MIN + 1.0
+
+    elif y > Y_MAX or y < Y_MIN:
+        # Bounce on Y axis (reflect direction across X-axis, i.e., 360 - direction or -direction)
+        direction = 360 - direction
+        
+        # Move back inside boundary slightly
+        if y > Y_MAX:
+            sprite.y_position = Y_MAX - 1.0
+        else:
+            sprite.y_position = Y_MIN + 1.0
+            
+    # Apply rotation style logic after calculating the new direction
+    if sprite.rotation_style == models.RotationStyle.LEFT_RIGHT:
+        if direction > 90 and direction <= 270:
+            # Sprite should face left (Flip costume horizontally on the client)
+            # Direction remains the same, but the costume displays mirrored.
+            pass
+        else:
+            # Sprite should face right
+            pass
+    elif sprite.rotation_style == models.RotationStyle.DONT_ROTATE:
+        # Costume never rotates on the client
+        direction = sprite.direction # Do not update direction based on bounce calculation if DONT_ROTATE
+        
+    sprite.direction = direction % 360 # Save the new direction
+
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
+def set_sprite_rotation_style(db: Session, sprite_id: int, rotation_style: schemas.RotationStyle) -> Optional[models.Sprite]:
+    """Set the sprite's rotation style."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.rotation_style = rotation_style
+    
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+
 # ============================================================================
 # COSTUME CRUD OPERATIONS
 # ============================================================================
@@ -1088,3 +1350,6 @@ def increment_library_download_count(db: Session, library_sprite_id: int, is_spr
     if item:
         item.download_count += 1
         db.commit()
+
+
+        

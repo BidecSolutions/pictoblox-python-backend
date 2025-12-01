@@ -743,6 +743,98 @@ class BulkCostumeDelete(BaseModel):
     costume_ids: List[int]
 
 
-# Update forward references
-SpriteWithCostumes.model_rebuild()
-SpriteComplete.model_rebuild()
+# ============================================================================
+# MOTION BLOCKS
+# ============================================================================
+
+from enum import Enum as PyEnum
+
+# Enum for Rotation Style
+class RotationStyle(str, PyEnum):
+    ALL_AROUND = "all_around"
+    LEFT_RIGHT = "left_right"
+    DONT_ROTATE = "dont_rotate"
+
+# Enum for Motion Targets (random position, mouse-pointer, other sprites)
+class MotionTarget(str, PyEnum):
+    RANDOM_POSITION = "random_position"
+    MOUSE_POINTER = "mouse-pointer"
+    # Additional logic needed for other sprite targets (target should be sprite ID)
+
+from enum import Enum as PyEnum
+
+# Enum for Rotation Style
+class RotationStyle(str, PyEnum):
+    ALL_AROUND = "all_around"
+    LEFT_RIGHT = "left_right"
+    DONT_ROTATE = "dont_rotate"
+
+# Enum for Motion Targets (random position, mouse-pointer, other sprites)
+class MotionTarget(str, PyEnum):
+    RANDOM_POSITION = "random_position"
+    MOUSE_POINTER = "mouse-pointer"
+    # Additional logic needed for other sprite targets (target should be sprite ID)
+
+
+# --- Motion Block Payloads ---
+
+class MotionMove(BaseModel):
+    """Payload for 'move steps'"""
+    steps: float = Field(10.0, description="Number of steps to move in the current direction.")
+
+class MotionTurn(BaseModel):
+    """Payload for 'turn degrees'"""
+    degrees: float = Field(15.0, description="Degrees to turn (clockwise or counter-clockwise).")
+
+class MotionGoToTarget(BaseModel):
+    """Payload for 'go to target' (e.g., random position, mouse-pointer)"""
+    target: MotionTarget = Field(MotionTarget.RANDOM_POSITION, description="Target type to go to.")
+
+class MotionGoToPayload(BaseModel):
+    """Combined Payload for go to x:y:, go to random, or go to mouse-pointer"""
+    target: Optional[MotionTarget] = Field(None, description="Target (random_position, mouse-pointer, or None for x/y).")
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+class MotionGlide(BaseModel):
+    """Payload for 'glide secs to target/x:y:'"""
+    secs: float = Field(1.0, gt=0, description="Duration in seconds for the glide animation.")
+    target: Optional[MotionTarget] = Field(None, description="Target type for glide (random_position or x/y if None).")
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+class MotionPointDirection(BaseModel):
+    """Payload for 'point in direction'"""
+    direction: float = Field(90.0, ge=-180, le=360, description="Direction in degrees (typically 0-360).")
+
+class MotionPointTowardsTarget(BaseModel):
+    """Payload for 'point towards target'"""
+    target: MotionTarget = Field(MotionTarget.MOUSE_POINTER, description="Target to point towards.")
+
+class MotionChangePosition(BaseModel):
+    """Payload for 'change x/y by'"""
+    change: float = Field(10.0, description="Amount to change the x or y position by.")
+
+class MotionSetPosition(BaseModel):
+    """Payload for 'set x/y to'"""
+    value: float = Field(0.0, description="Value to set the x or y position to.")
+
+class MotionSetRotationStyle(BaseModel):
+    """Payload for 'set rotation style'"""
+    rotation_style: RotationStyle = Field(RotationStyle.LEFT_RIGHT, description="Rotation style enum.")
+
+class MotionPointTowardsPayload(BaseModel):
+    """Payload for 'point towards target', including optional coordinates for mouse-pointer."""
+    target: str = Field(..., description="Target type (e.g., 'mouse-pointer' or 'sprite-2')")
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+# --- Reporter Block Response Schemas ---
+
+class MotionPositionValue(BaseModel):
+    """Response model for X Position, Y Position, Direction reporter blocks"""
+    value: float
+    
+    class Config:
+        from_attributes = True
+
