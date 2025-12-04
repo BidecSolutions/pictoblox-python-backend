@@ -1949,6 +1949,149 @@ def get_size(
 
     return {"value": sprite.size}
 
+# ============================================================================
+# EVENT MESSAGING ENDPOINTS
+# ============================================================================
+
+@app.post("/api/v1/projects/{project_id}/messages", response_model=schemas.Message, status_code=status.HTTP_201_CREATED, tags=["Events"])
+def create_project_message(
+    project_id: int,
+    message: schemas.MessageCreate,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new named message (e.g., 'message1') for use in broadcast blocks"""
+    if message.project_id != project_id:
+        raise HTTPException(status_code=400, detail="Project ID mismatch")
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    return crud.create_message(db, message=message)
+
+@app.get("/api/v1/projects/{project_id}/messages", response_model=List[schemas.Message], tags=["Events"])
+def list_project_messages(
+    project_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all predefined messages for a project"""
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Check access rights (allowing public access if project is public)
+    if project.user_id != current_user.id and not project.is_public:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    return crud.get_project_messages(db, project_id=project_id)
+
+
+# ============================================================================
+# EVENT EXECUTION BLOCKS
+# ============================================================================
+
+@app.post("/api/v1/projects/{project_id}/broadcast", tags=["Events"])
+def broadcast_message(
+    project_id: int,
+    request: schemas.BroadcastRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Block: broadcast [message1] OR broadcast [message1] and wait"""
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Authorization check: only the owner/editor should initiate backend code events
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to run/modify this project")
+    
+    # 1. Log the broadcast event in the database
+    log = crud.log_broadcast(db, project_id, request.message_name, request.wait, current_user.id)
+
+    # 2. Key Action: Signal the client (frontend) interpreter
+    # In a real-time system (using WebSockets/SSE), this API would trigger a 
+    # message to all connected clients viewing this project.
+    
+    # Placeholder response to signal success
+    action = "broadcast and wait" if request.wait else "broadcast"
+    return {
+        "message": f"'{request.message_name}' {action} initiated.",
+        "log_id": log.id,
+        "waits_for_completion": request.wait
+    }
+
+
+# ============================================================================
+# EVENT LISTENERS (Simulated Triggers)
+# ============================================================================
+
+# NOTE: The "when [flag] clicked", "when [key] pressed", "when stage clicked", 
+# "when backdrop switches", and "when I receive [message]" blocks are typically 
+# **listeners** handled by the client-side JavaScript interpreter. 
+
+# However, we can create API endpoints to signal these events, especially for 
+# remote control or testing purposes, which the client interpreter listens to.
+
+@app.post("/api/v1/projects/{project_id}/trigger-event/{event_name}", tags=["Events"])
+def trigger_system_event(
+    project_id: int,
+    event_name: str, # e.g., "green_flag", "key_space", "stage_click", "loudness_high"
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Simulates a system event trigger (like Green Flag Clicked) 
+    that the client-side interpreter will pick up and execute.
+    """
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    # In a real application, this would trigger a WebSocket message to the client.
+    return {"message": f"Event '{event_name}' signaled for project {project_id}"}
+
+
+# ============================================================================
+# SENSING EVENT ENDPOINTS (Loudness, Timer, etc.)
+# ============================================================================
+
+@app.post("/api/v1/sensor-data", status_code=status.HTTP_202_ACCEPTED, tags=["Sensing", "Events"])
+def report_sensor_data(
+    report: schemas.SensorDataReport,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Handles real-time sensor data reports from the client (e.g., loudness, timer).
+    The client interpreter uses this data to evaluate 'when loudness > 10' blocks.
+    """
+    project = crud.get_project(db, report.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Check if the user is authorized to run this project (or is the owner)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to run project scripts")
+    
+    # NOTE: In a production environment, this data would likely be logged 
+    # to a fast NoSQL store or handled via WebSockets, not SQLAlchemy.
+    
+    # Placeholder: The backend acknowledges the report.
+    # The client (interpreter) is responsible for running the 'when loudness > X' script 
+    # if the condition (report.value > X) is met.
+    
+    return {
+        "message": f"Sensor data '{report.sensor_name}' reported with value {report.value}",
+        "project_id": report.project_id
+    }
+
 # # ============================================================================
 # # EVENT BINDING ENDPOINTS
 # # ============================================================================

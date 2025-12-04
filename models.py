@@ -3,7 +3,7 @@ Database Models for Blockly Platform
 SQLAlchemy ORM Models
 """
 
-from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey, Enum, Float, JSON
+from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey, Enum, Float, JSON, UniqueConstraint   
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -582,6 +582,39 @@ class LibraryBackdrop(Base):
     # Timestamp
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+# --- Existing models.py code above ---
+# ... (User, Project, Asset, Sprite, Costume, Backdrop models remain the same)
+
+class Message(Base):
+    """Defines a message that can be broadcast within a project"""
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(100), nullable=False) # e.g., "message1", "game_start"
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Ensures message names are unique per project
+    __table_args__ = (UniqueConstraint('project_id', 'name', name='_project_message_uc'),)
+    
+    project = relationship("Project")
+
+
+class BroadcastLog(Base):
+    """Logs the execution of a broadcast block"""
+    __tablename__ = "broadcast_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    message_name = Column(String(100), nullable=False)
+    initiated_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    waits_for_completion = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    project = relationship("Project")
+    initiator = relationship("User")
 
 # # ============================================================================
 # # UPDATE EXISTING PROJECT MODEL

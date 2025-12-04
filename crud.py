@@ -1511,4 +1511,39 @@ def change_sprite_layer(db: Session, sprite_id: int, forward_layers: int) -> Opt
         
     return update_sprite_look(db, sprite)        
 
+# --- EVENTS CRUD ---
 
+def create_message(db: Session, message: schemas.MessageCreate) -> models.Message:
+    """Creates a new broadcast message name for a project"""
+    db_message = models.Message(**message.model_dump())
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+    return db_message
+
+def get_project_messages(db: Session, project_id: int) -> List[models.Message]:
+    """Gets all predefined messages for a project"""
+    return db.query(models.Message).filter(models.Message.project_id == project_id).all()
+
+def get_message_by_name(db: Session, project_id: int, name: str) -> Optional[models.Message]:
+    """Finds a message by its name within a project"""
+    return db.query(models.Message).filter(
+        models.Message.project_id == project_id,
+        models.Message.name == name
+    ).first()
+
+# NOTE on Broadcast: The broadcast function in the backend is primarily a log/signal.
+# The actual execution logic (stopping/waiting) is handled by the client-side interpreter.
+
+def log_broadcast(db: Session, project_id: int, message_name: str, wait: bool, user_id: int) -> models.BroadcastLog:
+    """Logs a broadcast event (for history or debugging)"""
+    db_log = models.BroadcastLog(
+        project_id=project_id,
+        message_name=message_name,
+        initiated_by_user_id=user_id,
+        waits_for_completion=wait
+    )
+    db.add(db_log)
+    db.commit()
+    db.refresh(db_log)
+    return db_log

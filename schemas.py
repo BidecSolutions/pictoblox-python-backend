@@ -1057,7 +1057,38 @@ class WhenBroadcastReceivedHandler(EventHandlerBase):
     message_name: str
 
 
+# ----------------------------------------------------------------------------
+# EVENTS BLOCKS SCHEMAS
+# ----------------------------------------------------------------------------
 
+# For creating new messages that can be broadcast
+class MessageBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+class MessageCreate(MessageBase):
+    project_id: int
+
+class Message(MessageBase):
+    id: int
+    project_id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# For the broadcast block API request
+class BroadcastRequest(BaseModel):
+    message_name: str = Field(..., description="The name of the message to broadcast")
+    wait: bool = Field(False, description="Whether to wait for receivers to finish (used for 'broadcast and wait')")
+
+
+# --- Add this new schema to schemas.py ---
+
+class SensorDataReport(BaseModel):
+    project_id: int
+    sensor_name: str = Field(..., description="e.g., loudness, timer, video_motion")
+    value: float
+    sprite_id: Optional[int] = None    
 
 # # ============================================================================
 # # EVENT BINDING SCHEMAS (Link handlers to sprites/scripts)
