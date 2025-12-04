@@ -9,12 +9,16 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List
-
+import datetime
 import models
 import schemas
 import crud
 import auth
 from database import engine, get_db
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
+
+
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -1634,6 +1638,947 @@ def get_direction(
 
     return {"value": sprite.direction}
 
+# ============================================================================
+#LOOKS BLOCK ENDPOINT
+# ============================================================================
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/say", response_model=schemas.Sprite, tags=["Looks"])
+def say_message(
+    sprite_id: int,
+    say_data: schemas.LookSayThink,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Say a message for a duration or indefinitely."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_message(db, sprite_id=sprite_id, message=say_data.message, action=schemas.LookMessageAction.SAY, secs=say_data.secs)
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/think", response_model=schemas.Sprite, tags=["Looks"])
+def think_message(
+    sprite_id: int,
+    think_data: schemas.LookSayThink,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Think a message for a duration or indefinitely."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_message(db, sprite_id=sprite_id, message=think_data.message, action=schemas.LookMessageAction.THINK, secs=think_data.secs)
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/switch_costume", response_model=schemas.Sprite, tags=["Looks"])
+def switch_costume(
+    sprite_id: int,
+    # CHANGE THIS LINE: Replace MotionPointTowardsTarget with the new schema
+    costume_data: schemas.LookSwitchCostumePayload, 
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Switch the sprite's current costume to a named costume."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    # The rest of the logic is now correct:
+    return crud.switch_sprite_costume(db, sprite_id=sprite_id, costume_name=costume_data.target)
+
+# @app.put("/api/v1/sprites/{sprite_id}/looks/switch_costume", response_model=schemas.Sprite, tags=["Looks"])
+# def switch_costume(
+#     sprite_id: int,
+#     costume_data: schemas.MotionPointTowardsTarget, # Reusing a simple string payload model if available
+#     current_user: models.User = Depends(auth.get_current_user),
+    
+#     db: Session = Depends(get_db)
+# ):
+#     """Switch the sprite's current costume to a named costume."""
+#     sprite = crud.get_sprite(db, sprite_id)
+#     if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+#     project = crud.get_project(db, sprite.project_id)
+#     if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+#     return crud.switch_sprite_costume(db, sprite_id=sprite_id, costume_name=costume_data.target)
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/next_costume", response_model=schemas.Sprite, tags=["Looks"])
+def next_costume(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Switch to the next costume in the list."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.switch_sprite_costume(db, sprite_id=sprite_id, costume_name=None) 
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/change_size", response_model=schemas.Sprite, tags=["Looks"])
+def change_size(
+    sprite_id: int,
+    size_data: schemas.LookChangeSize,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change the sprite's size by an amount (percentage)."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.change_sprite_size(db, sprite_id=sprite_id, change=size_data.change)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/set_size", response_model=schemas.Sprite, tags=["Looks"])
+def set_size(
+    sprite_id: int,
+    size_data: schemas.LookSetSize,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set the sprite's size to a percentage."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_size(db, sprite_id=sprite_id, percent=size_data.percent)
+
+
+# --- Backdrop Blocks ---
+
+@app.put("/api/v1/projects/{project_id}/switch-backdrop/{backdrop_id}", response_model=schemas.StageSetting, tags=["Backdrops"])
+def switch_backdrop_by_id(
+    project_id: int,
+    backdrop_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Block: switch backdrop to [backdrop_id]"""
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    updated_stage = crud.switch_project_backdrop(db, project_id, target_backdrop_id=backdrop_id)
+    if not updated_stage:
+        raise HTTPException(status_code=404, detail="Backdrop not found for this project")
+        
+    return updated_stage
+
+@app.put("/api/v1/projects/{project_id}/next-backdrop", response_model=schemas.StageSetting, tags=["Backdrops"])
+def next_backdrop(
+    project_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Block: next backdrop"""
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    updated_stage = crud.next_project_backdrop(db, project_id)
+    if not updated_stage:
+        raise HTTPException(status_code=400, detail="Failed to switch to next backdrop (no backdrops found)")
+        
+    return updated_stage
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/change_effect", response_model=schemas.Sprite, tags=["Looks"])
+def change_effect(
+    sprite_id: int,
+    effect_data: schemas.LookChangeEffect,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change a specific graphic effect by an amount."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    # The CRUD function handles both change and set, needing context.
+    # Set db.info flag to signal 'change' operation to crud function logic
+    db.info['change_effect'] = True 
+    result = crud.set_graphic_effect(db, sprite_id=sprite_id, effect=effect_data.effect, value=effect_data.change)
+    db.info['change_effect'] = False # Clear flag
+    return result
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/set_effect", response_model=schemas.Sprite, tags=["Looks"])
+def set_effect(
+    sprite_id: int,
+    effect_data: schemas.LookSetEffect,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Set a specific graphic effect to a specific value."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_graphic_effect(db, sprite_id=sprite_id, effect=effect_data.effect, value=effect_data.value)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/clear_effects", response_model=schemas.Sprite, tags=["Looks"])
+def clear_effects(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear all graphic effects."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.clear_graphic_effects(db, sprite_id=sprite_id)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/show", response_model=schemas.Sprite, tags=["Looks"])
+def show_sprite(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Show the sprite."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_visibility(db, sprite_id=sprite_id, is_visible=True)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/hide", response_model=schemas.Sprite, tags=["Looks"])
+def hide_sprite(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Hide the sprite."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_visibility(db, sprite_id=sprite_id, is_visible=False)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/go_to_layer", response_model=schemas.Sprite, tags=["Looks"])
+def go_to_layer(
+    sprite_id: int,
+    layer_data: schemas.LookGoToLayer,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Go to the front or back layer."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.set_sprite_layer(db, sprite_id=sprite_id, layer=layer_data.layer)
+
+
+@app.put("/api/v1/sprites/{sprite_id}/looks/change_layer", response_model=schemas.Sprite, tags=["Looks"])
+def change_layer(
+    sprite_id: int,
+    layer_data: schemas.LookChangeLayer,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Go forward or backward by a number of layers."""
+    # ... authorization checks ...
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return crud.change_sprite_layer(db, sprite_id=sprite_id, forward_layers=layer_data.forward_layers)
+
+
+# --- Looks Reporter Endpoints (GET) ---
+
+@app.get("/api/v1/sprites/{sprite_id}/looks/get_costume", response_model=schemas.LookReporterValue, tags=["Looks"])
+def get_costume_number(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reporter block: Get the sprite's current costume number."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id and not project.is_public: raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Assuming sprite.current_costume_id holds the number or can be easily looked up
+    return {"value": sprite.current_costume_id or 1.0}
+
+
+@app.get("/api/v1/sprites/{sprite_id}/looks/get_size", response_model=schemas.LookReporterValue, tags=["Looks"])
+def get_size(
+    sprite_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reporter block: Get the sprite's current size (percentage)."""
+    sprite = crud.get_sprite(db, sprite_id)
+    if not sprite: raise HTTPException(status_code=404, detail="Sprite not found")
+    project = crud.get_project(db, sprite.project_id)
+    if project.user_id != current_user.id and not project.is_public: raise HTTPException(status_code=403, detail="Not authorized")
+
+    return {"value": sprite.size}
+
+# # ============================================================================
+# # EVENT BINDING ENDPOINTS
+# # ============================================================================
+
+# @app.post("/api/v1/events/bindings", response_model=schemas.EventBinding, status_code=status.HTTP_201_CREATED)
+# def create_event_binding(
+#     binding: schemas.EventBindingCreate,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Create a new event binding (link event to script)
+   
+#     Example: When green flag clicked, run script
+#     """
+#     # Verify project ownership
+#     project = db.query(models.Project).filter(models.Project.id == binding.project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     # Verify sprite if provided
+#     if binding.sprite_id:
+#         sprite = db.query(models.Sprite).filter(models.Sprite.id == binding.sprite_id).first()
+#         if not sprite or sprite.project_id != binding.project_id:
+#             raise HTTPException(status_code=400, detail="Invalid sprite ID")
+   
+#     # Create event binding
+#     db_binding = models.EventBinding(**binding.dict())
+#     db.add(db_binding)
+#     db.commit()
+#     db.refresh(db_binding)
+   
+#     return db_binding
+
+
+# @app.get("/api/v1/projects/{project_id}/events/bindings", response_model=List[schemas.EventBinding])
+# def list_project_event_bindings(
+#     project_id: int,
+#     sprite_id: Optional[int] = Query(None),
+#     event_type: Optional[str] = Query(None),
+#     active_only: bool = Query(True),
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get all event bindings for a project"""
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id and not project.is_public:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     query = db.query(models.EventBinding).filter(models.EventBinding.project_id == project_id)
+   
+#     if sprite_id is not None:
+#         query = query.filter(models.EventBinding.sprite_id == sprite_id)
+   
+#     if event_type:
+#         query = query.filter(models.EventBinding.event_type == event_type)
+   
+#     if active_only:
+#         query = query.filter(models.EventBinding.is_active == True)
+   
+#     return query.order_by(models.EventBinding.execution_order).all()
+
+
+# @app.get("/api/v1/events/bindings/{binding_id}", response_model=schemas.EventBinding)
+# def get_event_binding(
+#     binding_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get a specific event binding"""
+#     binding = db.query(models.EventBinding).filter(models.EventBinding.id == binding_id).first()
+#     if not binding:
+#         raise HTTPException(status_code=404, detail="Event binding not found")
+   
+#     project = db.query(models.Project).filter(models.Project.id == binding.project_id).first()
+#     if project.user_id != current_user.id and not project.is_public:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     return binding
+
+
+# @app.put("/api/v1/events/bindings/{binding_id}", response_model=schemas.EventBinding)
+# def update_event_binding(
+#     binding_id: int,
+#     binding_update: schemas.EventBindingUpdate,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Update an event binding"""
+#     binding = db.query(models.EventBinding).filter(models.EventBinding.id == binding_id).first()
+#     if not binding:
+#         raise HTTPException(status_code=404, detail="Event binding not found")
+   
+#     project = db.query(models.Project).filter(models.Project.id == binding.project_id).first()
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     # Update fields
+#     update_data = binding_update.dict(exclude_unset=True)
+#     for field, value in update_data.items():
+#         setattr(binding, field, value)
+   
+#     db.commit()
+#     db.refresh(binding)
+#     return binding
+
+
+# @app.delete("/api/v1/events/bindings/{binding_id}", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_event_binding(
+#     binding_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete an event binding"""
+#     binding = db.query(models.EventBinding).filter(models.EventBinding.id == binding_id).first()
+#     if not binding:
+#         raise HTTPException(status_code=404, detail="Event binding not found")
+   
+#     project = db.query(models.Project).filter(models.Project.id == binding.project_id).first()
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     db.delete(binding)
+#     db.commit()
+#     return None
+
+
+# # ============================================================================
+# # BROADCAST MESSAGE ENDPOINTS
+# # ============================================================================
+
+# @app.post("/api/v1/broadcasts", response_model=schemas.BroadcastMessage, status_code=status.HTTP_201_CREATED)
+# def create_broadcast_message(
+#     message: schemas.BroadcastMessageCreate,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Create a new broadcast message definition"""
+#     project = db.query(models.Project).filter(models.Project.id == message.project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     # Check if message name already exists
+#     existing = db.query(models.BroadcastMessage).filter(
+#         models.BroadcastMessage.project_id == message.project_id,
+#         models.BroadcastMessage.name == message.name
+#     ).first()
+   
+#     if existing:
+#         raise HTTPException(status_code=400, detail="Broadcast message with this name already exists")
+   
+#     db_message = models.BroadcastMessage(**message.dict())
+#     db.add(db_message)
+#     db.commit()
+#     db.refresh(db_message)
+   
+#     return db_message
+
+
+# @app.get("/api/v1/projects/{project_id}/broadcasts", response_model=List[schemas.BroadcastMessage])
+# def list_broadcast_messages(
+#     project_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get all broadcast messages for a project"""
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id and not project.is_public:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     return db.query(models.BroadcastMessage)\
+#         .filter(models.BroadcastMessage.project_id == project_id)\
+#         .all()
+
+
+# @app.put("/api/v1/broadcasts/{message_id}", response_model=schemas.BroadcastMessage)
+# def update_broadcast_message(
+#     message_id: int,
+#     message_update: schemas.BroadcastMessageUpdate,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Update a broadcast message"""
+#     message = db.query(models.BroadcastMessage).filter(models.BroadcastMessage.id == message_id).first()
+#     if not message:
+#         raise HTTPException(status_code=404, detail="Broadcast message not found")
+   
+#     project = db.query(models.Project).filter(models.Project.id == message.project_id).first()
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     update_data = message_update.dict(exclude_unset=True)
+#     for field, value in update_data.items():
+#         setattr(message, field, value)
+   
+#     db.commit()
+#     db.refresh(message)
+#     return message
+
+
+# @app.delete("/api/v1/broadcasts/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_broadcast_message(
+#     message_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete a broadcast message"""
+#     message = db.query(models.BroadcastMessage).filter(models.BroadcastMessage.id == message_id).first()
+#     if not message:
+#         raise HTTPException(status_code=404, detail="Broadcast message not found")
+   
+#     project = db.query(models.Project).filter(models.Project.id == message.project_id).first()
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     db.delete(message)
+#     db.commit()
+#     return None
+
+
+# # ============================================================================
+# # EVENT TRIGGERING ENDPOINTS (Runtime)
+# # ============================================================================
+
+# @app.post("/api/v1/projects/{project_id}/events/trigger")
+# async def trigger_event(
+#     project_id: int,
+#     trigger_request: schemas.TriggerEventRequest,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Trigger an event and execute all matching handlers
+   
+#     Examples:
+#     - Trigger "when clicked": {"event_type": "when_clicked", "event_data": {}}
+#     - Trigger key press: {"event_type": "when_key_pressed", "event_data": {"key": "space"}}
+#     - Trigger broadcast: {"event_type": "when_broadcast_received", "event_data": {"message": "start"}}
+#     """
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     # Find matching event bindings
+#     bindings = db.query(models.EventBinding).filter(
+#         models.EventBinding.project_id == project_id,
+#         models.EventBinding.event_type == trigger_request.event_type.value,
+#         models.EventBinding.is_active == True
+#     ).order_by(models.EventBinding.execution_order).all()
+   
+#     # Filter bindings based on event data
+#     matching_bindings = []
+#     for binding in bindings:
+#         if _matches_event_data(binding, trigger_request.event_data):
+#             matching_bindings.append(binding)
+   
+#     # Execute handlers
+#     results = []
+#     for binding in matching_bindings:
+#         result = await _execute_event_handler(binding, trigger_request.event_data, db)
+#         results.append(result)
+   
+#     # Log event
+#     event_log = models.EventLog(
+#         project_id=project_id,
+#         user_id=current_user.id,
+#         event_type=trigger_request.event_type.value,
+#         event_data=trigger_request.event_data,
+#         handlers_executed=len(results),
+#         execution_time=sum(r.get('execution_time', 0) for r in results)
+#     )
+#     db.add(event_log)
+#     db.commit()
+   
+#     return {
+#         "event_type": trigger_request.event_type,
+#         "handlers_executed": len(results),
+#         "results": results
+#     }
+
+
+# @app.post("/api/v1/projects/{project_id}/broadcast")
+# async def broadcast_message(
+#     project_id: int,
+#     broadcast_request: schemas.BroadcastRequest,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Broadcast a message to all listening sprites
+   
+#     Example: {"message_name": "start game", "wait": false}
+#     """
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     if project.user_id != current_user.id:
+#         raise HTTPException(status_code=403, detail="Not authorized")
+   
+#     # Find all "when I receive [message]" handlers
+#     bindings = db.query(models.EventBinding).filter(
+#         models.EventBinding.project_id == project_id,
+#         models.EventBinding.event_type == "when_broadcast_received",
+#         models.EventBinding.is_active == True
+#     ).all()
+   
+#     # Filter by message name
+#     matching_bindings = [
+#         b for b in bindings
+#         if b.handler_data.get('message_name') == broadcast_request.message_name
+#     ]
+   
+#     # Execute handlers
+#     results = []
+#     for binding in matching_bindings:
+#         result = await _execute_event_handler(binding, broadcast_request.data, db)
+#         results.append(result)
+       
+#         if not broadcast_request.wait:
+#             # Don't wait for completion
+#             continue
+   
+#     return {
+#         "message": broadcast_request.message_name,
+#         "handlers_executed": len(results),
+#         "results": results if broadcast_request.wait else None
+#     }
+
+
+# # ============================================================================
+# # KEYBOARD STATE ENDPOINTS
+# # ============================================================================
+
+# @app.post("/api/v1/projects/{project_id}/keyboard/press")
+# def handle_key_press(
+#     project_id: int,
+#     key_event: schemas.KeyPressEvent,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Handle key press event"""
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     # Get or create keyboard state
+#     kb_state = db.query(models.KeyboardState).filter(
+#         models.KeyboardState.project_id == project_id
+#     ).first()
+   
+#     if not kb_state:
+#         kb_state = models.KeyboardState(project_id=project_id, pressed_keys=[])
+#         db.add(kb_state)
+   
+#     # Update state
+#     pressed_keys = kb_state.pressed_keys or []
+#     if key_event.key.value not in pressed_keys:
+#         pressed_keys.append(key_event.key.value)
+   
+#     kb_state.pressed_keys = pressed_keys
+#     kb_state.last_key = key_event.key.value
+#     kb_state.last_press_time = key_event.timestamp
+   
+#     db.commit()
+   
+#     # Trigger "when key pressed" events
+#     trigger_data = schemas.TriggerEventRequest(
+#         event_type=schemas.EventType.WHEN_KEY_PRESSED,
+#         event_data={"key": key_event.key.value}
+#     )
+   
+#     return {"status": "key_pressed", "key": key_event.key.value}
+
+
+# @app.post("/api/v1/projects/{project_id}/keyboard/release")
+# def handle_key_release(
+#     project_id: int,
+#     key_event: schemas.KeyReleaseEvent,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Handle key release event"""
+#     kb_state = db.query(models.KeyboardState).filter(
+#         models.KeyboardState.project_id == project_id
+#     ).first()
+   
+#     if kb_state:
+#         pressed_keys = kb_state.pressed_keys or []
+#         if key_event.key.value in pressed_keys:
+#             pressed_keys.remove(key_event.key.value)
+#         kb_state.pressed_keys = pressed_keys
+#         db.commit()
+   
+#     return {"status": "key_released", "key": key_event.key.value}
+
+
+# @app.get("/api/v1/projects/{project_id}/keyboard/state", response_model=schemas.KeyboardState)
+# def get_keyboard_state(
+#     project_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get current keyboard state"""
+#     kb_state = db.query(models.KeyboardState).filter(
+#         models.KeyboardState.project_id == project_id
+#     ).first()
+   
+#     if not kb_state:
+#         return schemas.KeyboardState(pressed_keys=[], last_key=None)
+   
+#     return schemas.KeyboardState(
+#         pressed_keys=[schemas.KeyType(k) for k in (kb_state.pressed_keys or [])],
+#         last_key=schemas.KeyType(kb_state.last_key) if kb_state.last_key else None,
+#         last_press_time=kb_state.last_press_time
+#     )
+
+
+# # ============================================================================
+# # TIMER ENDPOINTS
+# # ============================================================================
+
+# @app.get("/api/v1/projects/{project_id}/timer", response_model=schemas.TimerState)
+# def get_timer_state(
+#     project_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get current timer value"""
+#     timer = db.query(models.TimerState).filter(
+#         models.TimerState.project_id == project_id
+#     ).first()
+   
+#     if not timer:
+#         # Create default timer
+#         timer = models.TimerState(project_id=project_id, current_value=0.0, is_running=True)
+#         db.add(timer)
+#         db.commit()
+#         db.refresh(timer)
+   
+#     # Calculate current value if running
+#     if timer.is_running:
+#         elapsed = (datetime.utcnow() - timer.started_at).total_seconds()
+#         timer.current_value = elapsed
+   
+#     return schemas.TimerState(
+#         project_id=project_id,
+#         current_value=timer.current_value,
+#         is_running=timer.is_running,
+#         started_at=timer.started_at
+#     )
+
+
+# @app.post("/api/v1/projects/{project_id}/timer/reset")
+# def reset_timer(
+#     project_id: int,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Reset timer to 0"""
+#     timer = db.query(models.TimerState).filter(
+#         models.TimerState.project_id == project_id
+#     ).first()
+   
+#     if not timer:
+#         timer = models.TimerState(project_id=project_id)
+#         db.add(timer)
+   
+#     timer.current_value = 0.0
+#     timer.started_at = datetime.utcnow()
+#     timer.is_running = True
+   
+#     db.commit()
+   
+#     return {"message": "Timer reset", "value": 0.0}
+
+
+# # ============================================================================
+# # SENSOR READING ENDPOINTS
+# # ============================================================================
+
+# @app.post("/api/v1/projects/{project_id}/sensors/reading")
+# def record_sensor_reading(
+#     project_id: int,
+#     reading: schemas.SensorReading,
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Record a sensor reading (loudness, video motion, etc.)"""
+#     project = db.query(models.Project).filter(models.Project.id == project_id).first()
+#     if not project:
+#         raise HTTPException(status_code=404, detail="Project not found")
+   
+#     db_reading = models.SensorReading(
+#         project_id=project_id,
+#         sensor_type=reading.sensor_type.value,
+#         value=reading.value
+#     )
+#     db.add(db_reading)
+#     db.commit()
+   
+#     # Check for "when greater than" triggers
+#     _check_sensor_triggers(project_id, reading.sensor_type.value, reading.value, db)
+   
+#     return {"status": "recorded", "sensor": reading.sensor_type, "value": reading.value}
+
+
+# @app.get("/api/v1/projects/{project_id}/sensors/latest")
+# def get_latest_sensor_readings(
+#     project_id: int,
+#     sensor_type: Optional[str] = Query(None),
+#     current_user: models.User = Depends(auth.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get latest sensor readings"""
+#     query = db.query(models.SensorReading).filter(
+#         models.SensorReading.project_id == project_id
+#     )
+   
+#     if sensor_type:
+#         query = query.filter(models.SensorReading.sensor_type == sensor_type)
+   
+#     readings = query.order_by(models.SensorReading.recorded_at.desc()).limit(10).all()
+   
+#     return [
+#         {
+#             "sensor_type": r.sensor_type,
+#             "value": r.value,
+#             "recorded_at": r.recorded_at
+#         }
+#         for r in readings
+#     ]
+
+
+# # ============================================================================
+# # HELPER FUNCTIONS
+# # ============================================================================
+
+# def _matches_event_data(binding: models.EventBinding, event_data: Dict[str, Any]) -> bool:
+#     """Check if event data matches handler requirements"""
+#     handler_data = binding.handler_data or {}
+   
+#     # For key press events
+#     if binding.event_type == "when_key_pressed":
+#         required_key = handler_data.get('key')
+#         actual_key = event_data.get('key')
+#         return required_key == actual_key or required_key == 'any'
+   
+#     # For backdrop switch events
+#     if binding.event_type == "when_backdrop_switches":
+#         required_backdrop = handler_data.get('backdrop_id')
+#         actual_backdrop = event_data.get('backdrop_id')
+#         return required_backdrop == actual_backdrop or required_backdrop is None
+   
+#     # For broadcast events
+#     if binding.event_type == "when_broadcast_received":
+#         required_message = handler_data.get('message_name')
+#         actual_message = event_data.get('message') or event_data.get('message_name')
+#         return required_message == actual_message
+   
+#     # Default: match
+#     return True
+
+
+# async def _execute_event_handler(
+#     binding: models.EventBinding,
+#     event_data: Dict[str, Any],
+#     db: Session
+# ) -> Dict[str, Any]:
+#     """Execute an event handler's script"""
+#     import time
+#     start_time = time.time()
+   
+#     try:
+#         # Here you would execute the script_blocks
+#         # For now, return mock execution
+       
+#         # TODO: Integrate with your code execution engine
+#         script_blocks = binding.script_blocks or []
+       
+#         execution_time = time.time() - start_time
+       
+#         return {
+#             "binding_id": binding.id,
+#             "success": True,
+#             "blocks_executed": len(script_blocks),
+#             "execution_time": execution_time
+#         }
+       
+#     except Exception as e:
+#         execution_time = time.time() - start_time
+#         return {
+#             "binding_id": binding.id,
+#             "success": False,
+#             "error": str(e),
+#             "execution_time": execution_time
+#         }
+
+
+# def _check_sensor_triggers(project_id: int, sensor_type: str, value: float, db: Session):
+#     """Check if sensor value triggers any 'when greater than' events"""
+#     bindings = db.query(models.EventBinding).filter(
+#         models.EventBinding.project_id == project_id,
+#         models.EventBinding.event_type == "when_greater_than",
+#         models.EventBinding.is_active == True
+#     ).all()
+   
+#     for binding in bindings:
+#         handler_data = binding.handler_data or {}
+#         if handler_data.get('sensor_type') == sensor_type:
+#             threshold = handler_data.get('threshold_value', 0)
+#             if value > threshold:
+#                 # Trigger event
+#                 # TODO: Execute handler asynchronously
+#                 pass 
 
 
 if __name__ == "__main__":

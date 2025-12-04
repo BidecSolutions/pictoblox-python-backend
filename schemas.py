@@ -3,10 +3,12 @@ Pydantic Schemas for API Request/Response Validation
 """
 
 from pydantic import BaseModel, EmailStr, Field, validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Annotated
 from datetime import datetime
 from models import UserRole, ProjectStatus, AssetType
-
+from enum import Enum as PyEnum
+from typing import Optional
+from pydantic import BaseModel, Field, conint, confloat
 
 # ============================================================================
 # USER SCHEMAS
@@ -363,6 +365,12 @@ class Sprite(SpriteBase):
     properties: Dict[str, Any]
     created_at: datetime
     updated_at: Optional[datetime] = None
+    current_message: Optional[str] = Field(None, description="The current message being said or thought.")
+    message_duration: Optional[float] = Field(None, description="The remaining duration of the message.")
+    message_type: Optional[str] = Field(None, description="The type of message ('say' or 'think').")
+    current_costume_id: Optional[int] = None
+    current_costume_name: Optional[str] = None
+    graphic_effects: Optional[Dict[str, float]] = Field(None, description="Map of graphic effects and their values.") 
 
     class Config:
         from_attributes = True
@@ -542,7 +550,7 @@ class SpriteVariableBase(BaseModel):
 class SpriteVariableCreate(SpriteVariableBase):
     """Schema for creating a variable"""
     project_id: int
-    sprite_id: Optional[int] = None  # NULL for global variables
+    sprite_id: Optional[int] = None  
     x_position: int = 10
     y_position: int = 10
 
@@ -776,8 +784,6 @@ class MotionTarget(str, PyEnum):
     # Additional logic needed for other sprite targets (target should be sprite ID)
 
 
-# --- Motion Block Payloads ---
-
 class MotionMove(BaseModel):
     """Payload for 'move steps'"""
     steps: float = Field(10.0, description="Number of steps to move in the current direction.")
@@ -838,3 +844,498 @@ class MotionPositionValue(BaseModel):
     class Config:
         from_attributes = True
 
+# --- Looks Block Enums ---
+
+class LookMessageAction(str, PyEnum):
+    SAY = "say"
+    THINK = "think"
+
+class LookEffect(str, PyEnum):
+    COLOR = "color"
+    FISHEYE = "fisheye"
+    WHIRL = "whirl"
+    PIXELATE = "pixelate"
+    MOSAIC = "mosaic"
+    BRIGHTNESS = "brightness"
+    GHOST = "ghost"
+
+class LookLayer(str, PyEnum):
+    FRONT = "front"
+    BACK = "back"
+
+# -
+# -- Looks Block Payloads ---
+
+class LookSayThink(BaseModel):
+    """Payload for 'say/think' blocks with duration."""
+    message: str = Field("Hello!", description="The text the sprite should say or think.")
+    secs: Optional[float] = Field(None, gt=0, description="Duration in seconds (Optional for permanent say/think).")
+
+class LookChangeSize(BaseModel):
+    """Payload for 'change size by' block."""
+    change: float = Field(10.0, description="The amount to change the size by.")
+
+class LookSwitchCostumePayload(BaseModel):
+    """
+    Payload for 'switch costume to' block. 
+    Uses 'target' field to match expected input structure.
+    """
+    target: str = Field(..., description="The name of the costume to switch to.")    
+
+# class LookSetSize(BaseModel):
+#     """Payload for 'set size to' block."""
+#     percent: confloat(gt=0) = Field(100.0, description="The percentage of the original size.")
+
+class LookSetSize(BaseModel):
+    """Payload for 'set size to' block."""
+    percent: Annotated[float, confloat(gt=0)] = Field(100.0, description="The percentage of the original size.")
+
+class LookChangeEffect(BaseModel):
+    """Payload for 'change effect by' block."""
+    effect: LookEffect = Field(LookEffect.COLOR, description="The graphic effect to change.")
+    change: float = Field(25.0, description="The amount to change the effect by.")
+
+class LookSetEffect(BaseModel):
+    """Payload for 'set effect to' block."""
+    effect: LookEffect = Field(LookEffect.COLOR, description="The graphic effect to set.")
+    value: float = Field(0.0, description="The value to set the effect to.")
+
+class LookGoToLayer(BaseModel):
+    """Payload for 'go to front/back layer' block."""
+    layer: LookLayer = Field(LookLayer.FRONT, description="The layer to move the sprite to.")
+
+class LookChangeLayer(BaseModel):
+    """Payload for 'go forward/backward layers' block."""
+    forward_layers: int = Field(1, description="Number of layers to move forward/backward.")
+
+# --- Reporter Block Response Schemas ---
+
+class LookReporterValue(BaseModel):
+    """Generic response for reporter blocks (costume, backdrop, size)."""
+    value: float
+
+
+"""
+Add these Event System schemas to your existing schemas.py file
+Append after your existing sprite schemas
+"""
+
+from pydantic import BaseModel, Field, validator
+from typing import Optional, List, Dict, Any, Union
+from datetime import datetime
+from enum import Enum
+
+
+# ============================================================================
+# EVENT ENUMS
+# ============================================================================
+
+class EventType(str, Enum):
+    """Types of events that can be triggered"""
+    WHEN_CLICKED = "when_clicked"
+    WHEN_KEY_PRESSED = "when_key_pressed"
+    WHEN_SPRITE_CLICKED = "when_sprite_clicked"
+    WHEN_BACKDROP_SWITCHES = "when_backdrop_switches"
+    WHEN_GREATER_THAN = "when_greater_than"
+    WHEN_BROADCAST_RECEIVED = "when_broadcast_received"
+    WHEN_I_START_AS_CLONE = "when_i_start_as_clone"
+
+
+class KeyType(str, Enum):
+    """Keyboard keys that can trigger events"""
+    SPACE = "space"
+    UP_ARROW = "up arrow"
+    DOWN_ARROW = "down arrow"
+    RIGHT_ARROW = "right arrow"
+    LEFT_ARROW = "left arrow"
+    ANY = "any"
+    # Letters
+    A = "a"
+    B = "b"
+    C = "c"
+    D = "d"
+    E = "e"
+    F = "f"
+    G = "g"
+    H = "h"
+    I = "i"
+    J = "j"
+    K = "k"
+    L = "l"
+    M = "m"
+    N = "n"
+    O = "o"
+    P = "p"
+    Q = "q"
+    R = "r"
+    S = "s"
+    T = "t"
+    U = "u"
+    V = "v"
+    W = "w"
+    X = "x"
+    Y = "y"
+    Z = "z"
+    # Numbers
+    NUM_0 = "0"
+    NUM_1 = "1"
+    NUM_2 = "2"
+    NUM_3 = "3"
+    NUM_4 = "4"
+    NUM_5 = "5"
+    NUM_6 = "6"
+    NUM_7 = "7"
+    NUM_8 = "8"
+    NUM_9 = "9"
+
+
+class SensorType(str, Enum):
+    """Sensor types for 'when greater than' blocks"""
+    LOUDNESS = "loudness"
+    TIMER = "timer"
+    VIDEO_MOTION = "video motion"
+
+
+class BroadcastScope(str, Enum):
+    """Scope of broadcast messages"""
+    PROJECT = "project"  # All sprites in project
+    SPRITE = "sprite"  # Specific sprite only
+    GLOBAL = "global"  # All projects (for multiplayer)
+
+
+# ============================================================================
+# EVENT HANDLER SCHEMAS
+# ============================================================================
+
+class EventHandlerBase(BaseModel):
+    """Base schema for event handlers"""
+    event_type: EventType
+    is_enabled: bool = True
+    execution_order: int = 0  # Order of execution if multiple handlers
+
+
+class WhenClickedHandler(EventHandlerBase):
+    """Handler for 'when green flag clicked' event"""
+    event_type: EventType = EventType.WHEN_CLICKED
+
+
+class WhenKeyPressedHandler(EventHandlerBase):
+    """Handler for 'when [key] pressed' event"""
+    event_type: EventType = EventType.WHEN_KEY_PRESSED
+    key: KeyType
+   
+    @validator('key')
+    def validate_key(cls, v):
+        if v not in KeyType.__members__.values():
+            raise ValueError(f'Invalid key: {v}')
+        return v
+
+
+class WhenSpriteClickedHandler(EventHandlerBase):
+    """Handler for 'when this sprite clicked' event"""
+    event_type: EventType = EventType.WHEN_SPRITE_CLICKED
+    sprite_id: int
+
+
+class WhenBackdropSwitchesHandler(EventHandlerBase):
+    """Handler for 'when backdrop switches to [backdrop]' event"""
+    event_type: EventType = EventType.WHEN_BACKDROP_SWITCHES
+    backdrop_id: Optional[int] = None  # None = any backdrop
+    backdrop_name: Optional[str] = None
+
+
+class WhenGreaterThanHandler(EventHandlerBase):
+    """Handler for 'when [sensor] > [value]' event"""
+    event_type: EventType = EventType.WHEN_GREATER_THAN
+    sensor_type: SensorType
+    threshold_value: float
+
+
+class WhenBroadcastReceivedHandler(EventHandlerBase):
+    """Handler for 'when I receive [message]' event"""
+    event_type: EventType = EventType.WHEN_BROADCAST_RECEIVED
+    message_name: str
+
+
+
+
+# # ============================================================================
+# # EVENT BINDING SCHEMAS (Link handlers to sprites/scripts)
+# # ============================================================================
+
+# class EventBindingBase(BaseModel):
+#     """Base schema for event bindings"""
+#     sprite_id: Optional[int] = None  # None for stage events
+#     project_id: int
+#     handler_data: Dict[str, Any]  # JSON data for the specific handler
+#     script_blocks: Optional[List[Dict[str, Any]]] = []  # Blockly blocks to execute
+#     is_active: bool = True
+
+
+# class EventBindingCreate(EventBindingBase):
+#     """Schema for creating event binding"""
+#     pass
+
+
+# class EventBindingUpdate(BaseModel):
+#     """Schema for updating event binding"""
+#     handler_data: Optional[Dict[str, Any]] = None
+#     script_blocks: Optional[List[Dict[str, Any]]] = None
+#     is_active: Optional[bool] = None
+#     execution_order: Optional[int] = None
+
+
+# class EventBinding(EventBindingBase):
+#     """Schema for event binding response"""
+#     id: int
+#     created_at: datetime
+#     updated_at: Optional[datetime] = None
+
+#     class Config:
+#         from_attributes = True
+
+
+# # ============================================================================
+# # BROADCAST MESSAGE SCHEMAS
+# # ============================================================================
+
+# class BroadcastMessageBase(BaseModel):
+#     """Base schema for broadcast messages"""
+#     name: str = Field(..., min_length=1, max_length=100)
+#     scope: BroadcastScope = BroadcastScope.PROJECT
+
+
+# class BroadcastMessageCreate(BroadcastMessageBase):
+#     """Schema for creating broadcast message"""
+#     project_id: int
+#     description: Optional[str] = None
+
+
+# class BroadcastMessageUpdate(BaseModel):
+#     """Schema for updating broadcast message"""
+#     name: Optional[str] = Field(None, min_length=1, max_length=100)
+#     description: Optional[str] = None
+#     scope: Optional[BroadcastScope] = None
+
+
+# class BroadcastMessage(BroadcastMessageBase):
+#     """Schema for broadcast message response"""
+#     id: int
+#     project_id: int
+#     description: Optional[str] = None
+#     created_at: datetime
+#     updated_at: Optional[datetime] = None
+
+#     class Config:
+#         from_attributes = True
+
+
+# # ============================================================================
+# # EVENT EXECUTION SCHEMAS (Runtime)
+# # ============================================================================
+
+# class TriggerEventRequest(BaseModel):
+#     """Request to trigger an event"""
+#     event_type: EventType
+#     event_data: Dict[str, Any] = {}  # Additional event data
+   
+#     # Examples of event_data:
+#     # - For key_pressed: {"key": "space"}
+#     # - For sprite_clicked: {"sprite_id": 123}
+#     # - For backdrop_switches: {"backdrop_id": 456}
+#     # - For broadcast: {"message": "start game"}
+#     # - For greater_than: {"sensor": "loudness", "value": 50}
+
+
+# class ExecuteScriptRequest(BaseModel):
+#     """Request to execute a script from event"""
+#     event_binding_id: int
+#     context: Optional[Dict[str, Any]] = {}  # Runtime context (variables, etc.)
+
+
+# class EventExecutionResult(BaseModel):
+#     """Result of event execution"""
+#     event_binding_id: int
+#     success: bool
+#     output: Optional[str] = None
+#     error: Optional[str] = None
+#     execution_time: float
+#     variables_changed: Dict[str, Any] = {}
+
+
+# class BroadcastRequest(BaseModel):
+#     """Request to broadcast a message"""
+#     message_name: str
+#     wait: bool = False  # If True, wait for all handlers to complete
+#     data: Optional[Dict[str, Any]] = {}  # Additional data to send
+
+
+# class BroadcastAndWaitRequest(BroadcastRequest):
+#     """Request to broadcast and wait"""
+#     wait: bool = True
+
+
+# # ============================================================================
+# # EVENT LOG SCHEMAS (for debugging/analytics)
+# # ============================================================================
+
+# class EventLogBase(BaseModel):
+#     """Base schema for event logs"""
+#     event_type: EventType
+#     event_data: Dict[str, Any]
+
+
+# class EventLog(EventLogBase):
+#     """Schema for event log response"""
+#     id: int
+#     project_id: int
+#     sprite_id: Optional[int] = None
+#     user_id: int
+#     triggered_at: datetime
+#     handlers_executed: int
+#     execution_time: float
+
+#     class Config:
+#         from_attributes = True
+
+
+# # ============================================================================
+# # KEY PRESS DETECTION SCHEMAS
+# # ============================================================================
+
+# class KeyPressEvent(BaseModel):
+#     """Schema for key press event"""
+#     key: KeyType
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+#     is_pressed: bool = True
+
+
+# class KeyReleaseEvent(BaseModel):
+#     """Schema for key release event"""
+#     key: KeyType
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+#     is_pressed: bool = False
+
+
+# class KeyboardState(BaseModel):
+#     """Schema for current keyboard state"""
+#     pressed_keys: List[KeyType] = []
+#     last_key: Optional[KeyType] = None
+#     last_press_time: Optional[datetime] = None
+
+
+# # ============================================================================
+# # MOUSE/CLICK EVENT SCHEMAS
+# # ============================================================================
+
+# class MouseClickEvent(BaseModel):
+#     """Schema for mouse click event"""
+#     x: float
+#     y: float
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+#     button: str = "left"  # left, right, middle
+
+
+# class SpriteClickEvent(BaseModel):
+#     """Schema for sprite click event"""
+#     sprite_id: int
+#     x: float  # Click position relative to sprite
+#     y: float
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# # ============================================================================
+# # TIMER SCHEMAS
+# # ============================================================================
+
+# class TimerState(BaseModel):
+#     """Schema for timer state"""
+#     project_id: int
+#     current_value: float  # Seconds since start
+#     is_running: bool = True
+#     started_at: datetime
+
+
+# class ResetTimerRequest(BaseModel):
+#     """Request to reset timer"""
+#     project_id: int
+
+
+# # ============================================================================
+# # SENSOR SCHEMAS (for when greater than blocks)
+# # ============================================================================
+
+# class SensorReading(BaseModel):
+#     """Schema for sensor reading"""
+#     sensor_type: SensorType
+#     value: float
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# class LoudnessReading(SensorReading):
+#     """Schema for loudness sensor reading"""
+#     sensor_type: SensorType = SensorType.LOUDNESS
+#     value: float = Field(..., ge=0, le=100)  # 0-100
+
+
+# class TimerReading(SensorReading):
+#     """Schema for timer reading"""
+#     sensor_type: SensorType = SensorType.TIMER
+
+
+# class VideoMotionReading(SensorReading):
+#     """Schema for video motion reading"""
+#     sensor_type: SensorType = SensorType.VIDEO_MOTION
+#     value: float = Field(..., ge=0, le=100)
+#     sprite_id: Optional[int] = None  # Motion on specific sprite
+
+
+# # ============================================================================
+# # CLONE EVENT SCHEMAS
+# # ============================================================================
+
+# class CloneCreatedEvent(BaseModel):
+#     """Schema for clone creation event"""
+#     original_sprite_id: int
+#     clone_sprite_id: int
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# class CloneDeletedEvent(BaseModel):
+#     """Schema for clone deletion event"""
+#     clone_sprite_id: int
+#     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# # ============================================================================
+# # EVENT STATISTICS SCHEMAS
+# # ============================================================================
+
+# class EventStatistics(BaseModel):
+#     """Schema for event statistics"""
+#     project_id: int
+#     total_events_triggered: int
+#     events_by_type: Dict[EventType, int]
+#     most_triggered_event: Optional[EventType] = None
+#     average_execution_time: float
+#     total_broadcasts_sent: int
+
+
+# # ============================================================================
+# # COMPLETE EVENT RESPONSE SCHEMAS
+# # ============================================================================
+
+# class ProjectEventsComplete(BaseModel):
+#     """Complete event data for a project"""
+#     project_id: int
+#     event_bindings: List[EventBinding]
+#     broadcast_messages: List[BroadcastMessage]
+#     keyboard_state: Optional[KeyboardState] = None
+#     timer_state: Optional[TimerState] = None
+
+
+# class SpriteEventsComplete(BaseModel):
+#     """Complete event data for a sprite"""
+#     sprite_id: int
+#     event_bindings: List[EventBinding]
+#     active_handlers: List[str]     

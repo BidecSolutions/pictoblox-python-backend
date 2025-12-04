@@ -1352,4 +1352,163 @@ def increment_library_download_count(db: Session, library_sprite_id: int, is_spr
         db.commit()
 
 
+# --- Looks Block CRUD Functions ---
+
+def update_sprite_look(db: Session, sprite: models.Sprite) -> models.Sprite:
+    """Helper to commit and refresh the sprite state."""
+    db.commit()
+    db.refresh(sprite)
+    return sprite
+
+def set_sprite_message(db: Session, sprite_id: int, message: str, action: schemas.LookMessageAction, secs: Optional[float]) -> Optional[models.Sprite]:
+    """Updates the sprite's message and message duration (e.g., say/think blocks)."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    # In a real system, this updates state variables used by the client.
+    sprite.current_message = message
+    sprite.message_duration = secs
+    sprite.message_type = action.value
+    
+    return update_sprite_look(db, sprite)
+
+def switch_sprite_costume(db: Session, sprite_id: int, costume_name: Optional[str] = None) -> Optional[models.Sprite]:
+    """Switches to a named costume or the next one."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: 
+        return None
+    
+    # 1. Update the NEW, dedicated column
+    if costume_name:
+        # **CORRECTION HERE:** Update the root column, NOT the properties dictionary
+        sprite.current_costume_name = costume_name  
         
+        # OPTIONAL: Remove the old key from properties to clean up the data.
+        if sprite.properties and 'current_costume_name' in sprite.properties:
+            del sprite.properties['current_costume_name']
+            # Re-assign or mark as changed if needed for SQLAlchemy mutation tracking 
+            sprite.properties = sprite.properties.copy() 
+    else: 
+        # Placeholder for next costume logic
+        print(f"Sprite {sprite_id} advancing to next costume.")
+        pass 
+        
+    return update_sprite_look(db, sprite)
+
+# def switch_sprite_costume(db: Session, sprite_id: int, costume_name: Optional[str] = None) -> Optional[models.Sprite]:
+#     """Switches to a named costume or the next one."""
+#     sprite = get_sprite(db, sprite_id)
+#     if not sprite: return None
+    
+#     # Initialize properties if null
+#     properties = sprite.properties or {} 
+
+#     if costume_name:
+#         # Change to update the 'current_costume_name' key inside the properties dictionary
+#         properties['current_costume_name'] = costume_name 
+#         # NOTE: SQLAlchemy may require setting the entire dictionary if using mutations
+#         sprite.properties = properties 
+#     else:
+#         # Placeholder for next costume logic
+#         print(f"Sprite {sprite_id} advancing to next costume.")
+#         pass 
+        
+#     return update_sprite_look(db, sprite)
+
+# def switch_sprite_costume(db: Session, sprite_id: int, costume_name: Optional[str] = None) -> Optional[models.Sprite]:
+#     """Switches to a named costume or the next one."""
+#     sprite = get_sprite(db, sprite_id)
+#     if not sprite: return None
+    
+#     # Logic to find costume (requires costumes table lookup)
+#     # For now, we update the costume_name property:
+#     if costume_name:
+#         sprite.current_costume_name = costume_name
+#     else:
+#         # Placeholder for next costume logic
+#         print(f"Sprite {sprite_id} advancing to next costume.")
+#         pass # Actual logic requires fetching all costumes for the sprite
+        
+#     return update_sprite_look(db, sprite)
+
+def change_sprite_size(db: Session, sprite_id: int, change: float) -> Optional[models.Sprite]:
+    """Changes the sprite's size by a given amount."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    # Size is typically stored as a percentage
+    sprite.size += change
+    
+    return update_sprite_look(db, sprite)
+
+def set_sprite_size(db: Session, sprite_id: int, percent: float) -> Optional[models.Sprite]:
+    """Sets the sprite's size to a percentage."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.size = percent
+    
+    return update_sprite_look(db, sprite)
+
+def set_graphic_effect(db: Session, sprite_id: int, effect: schemas.LookEffect, value: float) -> Optional[models.Sprite]:
+    """Sets a specific graphic effect to a value (used by change and set)."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    effects_data = sprite.graphic_effects or {}
+    
+    if effect.value in effects_data:
+        effects_data[effect.value] = value
+    else:
+        # If changing effect, apply the change to the current value
+        if 'change_effect' in db.info and db.info['change_effect']:
+             effects_data[effect.value] = effects_data.get(effect.value, 0.0) + value
+        else:
+            effects_data[effect.value] = value
+            
+    sprite.graphic_effects = effects_data # Save updated JSON/dict
+    
+    return update_sprite_look(db, sprite)
+
+def clear_graphic_effects(db: Session, sprite_id: int) -> Optional[models.Sprite]:
+    """Clears all graphic effects."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.graphic_effects = {}
+    
+    return update_sprite_look(db, sprite)
+
+def set_sprite_visibility(db: Session, sprite_id: int, is_visible: bool) -> Optional[models.Sprite]:
+    """Sets the sprite's visibility (show/hide)."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.is_visible = is_visible
+    
+    return update_sprite_look(db, sprite)
+
+def set_sprite_layer(db: Session, sprite_id: int, layer: schemas.LookLayer) -> Optional[models.Sprite]:
+    """Sets the sprite layer to front or back."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    if layer == schemas.LookLayer.FRONT:
+        # Logic to move to front (typically setting layer_order to max)
+        sprite.layer_order = 999 
+    elif layer == schemas.LookLayer.BACK:
+        # Logic to move to back (typically setting layer_order to min)
+        sprite.layer_order = 1 
+        
+    return update_sprite_look(db, sprite)
+
+def change_sprite_layer(db: Session, sprite_id: int, forward_layers: int) -> Optional[models.Sprite]:
+    """Moves the sprite forward or backward by a number of layers."""
+    sprite = get_sprite(db, sprite_id)
+    if not sprite: return None
+    
+    sprite.layer_order += forward_layers
+        
+    return update_sprite_look(db, sprite)        
+
+

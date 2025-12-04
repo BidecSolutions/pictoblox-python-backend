@@ -310,11 +310,14 @@ class Sprite(Base):
     # Layer ordering (z-index)
     layer_order = Column(Integer, default=0)
     
+  
     # Current costume
     current_costume_id = Column(Integer, nullable=True)
     
     # Interactivity
     draggable = Column(Boolean, default=False)
+
+    graphic_effects = Column(JSON, default={})
     
     # Custom properties (for extensions, effects, etc.)
     properties = Column(JSON, default={})
@@ -322,6 +325,7 @@ class Sprite(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
     
     # Relationships
     project = relationship("Project", back_populates="sprites")
@@ -362,6 +366,10 @@ class Costume(Base):
     
     # Order in costume list
     costume_order = Column(Integer, default=0)
+
+    # current_costume_id = Column(Integer, nullable=True)
+    # # ADD THIS LINE:
+    # current_costume_name = Column(String(100), nullable=True)
     
     # Timestamp
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -575,19 +583,229 @@ class LibraryBackdrop(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-# ============================================================================
-# UPDATE EXISTING PROJECT MODEL
-# Add these relationships to your existing Project model
-# ============================================================================
+# # ============================================================================
+# # UPDATE EXISTING PROJECT MODEL
+# # Add these relationships to your existing Project model
+# # ============================================================================
 
-"""
-Add these lines to your existing Project class in models.py:
+# """
+# Add these lines to your existing Project class in models.py:
 
-class Project(Base):
-    # ... existing fields ...
+# class Project(Base):
+#     # ... existing fields ...
     
-    # Add these relationships:
-    sprites = relationship("Sprite", back_populates="project", cascade="all, delete-orphan")
-    backdrops = relationship("Backdrop", back_populates="project", cascade="all, delete-orphan")
-    stage_setting = relationship("StageSetting", back_populates="project", uselist=False, cascade="all, delete-orphan")
-"""
+#     # Add these relationships:
+#     sprites = relationship("Sprite", back_populates="project", cascade="all, delete-orphan")
+#     backdrops = relationship("Backdrop", back_populates="project", cascade="all, delete-orphan")
+#     stage_setting = relationship("StageSetting", back_populates="project", uselist=False, cascade="all, delete-orphan")
+# """
+
+
+# """
+# Add these Event System models to your existing models.py file
+# Append after your existing sprite models
+# """
+
+# from sqlalchemy import Column, Integer, String, Float, Boolean, Text, JSON, ForeignKey, DateTime
+# from sqlalchemy.orm import relationship
+# from sqlalchemy.sql import func
+# from database import Base
+
+
+# # ============================================================================
+# # EVENT BINDING MODEL
+# # ============================================================================
+
+# class EventBinding(Base):
+#     """
+#     Event Binding Model
+#     Links events (when clicked, when key pressed, etc.) to scripts
+#     """
+#     __tablename__ = "event_bindings"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+#     sprite_id = Column(Integer, ForeignKey("sprites.id", ondelete="CASCADE"), nullable=True)  # None for stage events
+   
+#     # Event type and configuration
+#     event_type = Column(String(50), nullable=False)  # when_clicked, when_key_pressed, etc.
+#     handler_data = Column(JSON, default={})  # Event-specific data (key, backdrop_id, message, etc.)
+   
+#     # Script to execute
+#     script_blocks = Column(JSON, default=[])  # Array of Blockly blocks
+   
+#     # Execution settings
+#     is_active = Column(Boolean, default=True)
+#     execution_order = Column(Integer, default=0)  # Order if multiple handlers for same event
+   
+#     # Timestamps
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+   
+#     # Relationships
+#     project = relationship("Project", back_populates="event_bindings")
+#     sprite = relationship("Sprite", back_populates="event_bindings")
+
+
+# # ============================================================================
+# # BROADCAST MESSAGE MODEL
+# # ============================================================================
+
+# class BroadcastMessage(Base):
+#     """
+#     Broadcast Message Model
+#     Defines custom broadcast messages for inter-sprite communication
+#     """
+#     __tablename__ = "broadcast_messages"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+   
+#     # Message details
+#     name = Column(String(100), nullable=False)
+#     description = Column(Text)
+#     scope = Column(String(20), default="project")  # project, sprite, global
+   
+#     # Timestamps
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+   
+#     # Relationships
+#     project = relationship("Project", back_populates="broadcast_messages")
+
+
+# # ============================================================================
+# # EVENT LOG MODEL (for analytics/debugging)
+# # ============================================================================
+
+# class EventLog(Base):
+#     """
+#     Event Log Model
+#     Records when events are triggered for analytics and debugging
+#     """
+#     __tablename__ = "event_logs"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+#     sprite_id = Column(Integer, ForeignKey("sprites.id", ondelete="SET NULL"), nullable=True)
+#     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+   
+#     # Event details
+#     event_type = Column(String(50), nullable=False)
+#     event_data = Column(JSON, default={})
+   
+#     # Execution results
+#     handlers_executed = Column(Integer, default=0)
+#     execution_time = Column(Float, default=0.0)  # Seconds
+   
+#     # Timestamp
+#     triggered_at = Column(DateTime(timezone=True), server_default=func.now())
+   
+#     # Relationships
+#     project = relationship("Project")
+#     sprite = relationship("Sprite")
+#     user = relationship("User")
+
+
+# # ============================================================================
+# # KEYBOARD STATE MODEL (runtime state)
+# # ============================================================================
+
+# class KeyboardState(Base):
+#     """
+#     Keyboard State Model
+#     Tracks currently pressed keys for a project session
+#     """
+#     __tablename__ = "keyboard_states"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+#     session_id = Column(String(100))  # User session identifier
+   
+#     # Keyboard state
+#     pressed_keys = Column(JSON, default=[])  # Array of currently pressed keys
+#     last_key = Column(String(20))
+#     last_press_time = Column(DateTime(timezone=True))
+   
+#     # Timestamp
+#     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+   
+#     # Relationships
+#     project = relationship("Project")
+
+
+# # ============================================================================
+# # TIMER STATE MODEL (runtime state)
+# # ============================================================================
+
+# class TimerState(Base):
+#     """
+#     Timer State Model
+#     Tracks timer state for projects
+#     """
+#     __tablename__ = "timer_states"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+   
+#     # Timer state
+#     current_value = Column(Float, default=0.0)  # Current timer value in seconds
+#     is_running = Column(Boolean, default=True)
+#     started_at = Column(DateTime(timezone=True), server_default=func.now())
+   
+#     # Timestamp
+#     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+   
+#     # Relationships
+#     project = relationship("Project")
+
+
+# # ============================================================================
+# # SENSOR READING MODEL (for "when greater than" blocks)
+# # ============================================================================
+
+# class SensorReading(Base):
+#     """
+#     Sensor Reading Model
+#     Stores sensor readings for "when greater than" blocks
+#     """
+#     __tablename__ = "sensor_readings"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+#     sprite_id = Column(Integer, ForeignKey("sprites.id", ondelete="CASCADE"), nullable=True)
+   
+#     # Sensor data
+#     sensor_type = Column(String(50), nullable=False)  # loudness, timer, video_motion
+#     value = Column(Float, nullable=False)
+   
+#     # Timestamp
+#     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+   
+#     # Relationships
+#     project = relationship("Project")
+#     sprite = relationship("Sprite")
+
+
+# # ============================================================================
+# # UPDATE EXISTING MODELS - Add these relationships
+# # ============================================================================
+
+# """
+# Add these relationships to your existing models:
+
+# # In Project model:
+# class Project(Base):
+#     # ... existing fields ...
+   
+#     # Add these relationships:
+#     event_bindings = relationship("EventBinding", back_populates="project", cascade="all, delete-orphan")
+#     broadcast_messages = relationship("BroadcastMessage", back_populates="project", cascade="all, delete-orphan")
+
+
+# # In Sprite model:
+# class Sprite(Base):
+#     # ... existing fields ...
+   
+#     # Add this relationship:
+#     event_bindings = relationship("EventBinding", back_populates="sprite", cascade="all, delete-orphan")"""
